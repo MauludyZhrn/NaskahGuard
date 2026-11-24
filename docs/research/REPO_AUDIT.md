@@ -1,0 +1,23 @@
+# Audit Repositori Referensi & Agent Skills
+
+Tanggal Audit: 2026-11-24
+
+Dokumen ini merangkum hasil audit terhadap repositori open-source dan Agent Skills yang dirujuk sebelum implementasi **NaskahGuard**.
+
+## 1. Ringkasan Audit Repositori
+
+| Repositori | URL | Lisensi | Status Lingkungan Lokal | Apa yang Diadopsi sebagai Ide/Pola | Apa yang Tidak Diadopsi & Alasan |
+|---|---|---|---|---|---|
+| **Noplag Engine** | https://github.com/NoplagLabs/noplag-engine | Apache-2.0 | Tidak dapat dijalankan langsung (memerlukan PostgreSQL 15+ dengan `bigint[]` GIN & Python 3.12+; lingkungan hanya memiliki Python 3.10.11 & SQLite 3.40, tanpa Postgres/Docker). | - Pola Winnowing rolling hash + DF filtering (stop-gram).<br>- Seed-and-extend alignment berbasis offset karakter.<br>- Penggabungan interval setengah terbuka (`merge_intervals`) agar kata/karakter overlap tidak dihitung ganda.<br>- Desain adapter HTTP internal (`noplag_adapter.py`) khusus loopback jika user menjalankan Noplag Engine secara terpisah. | - Skema PostgreSQL-only (`bigint[]` GIN array_ops, `pgcrypto`, `ENUM`) karena sistem wajib langsung berjalan lokal di Windows dengan SQLite sebagai default.<br>- API tanpa autentikasi tidak boleh diekspos publik; NaskahGuard menambahkan guard loopback + bearer token. |
+| **AcademicGuard** | https://github.com/sunilgentyala/academicguard | MIT | Dapat dibaca sebagai referensi Python 3.10+. | - Konsep kombinasi Winnowing + MinHash/LSH + TF-IDF sentence similarity.<br>- Lookup judul ke Crossref tanpa API key.<br>- Pendekatan pelaporan terstruktur dan jujur mengenai batasan lokal vs layanan eksternal. | - Modul AI-content detector, grammar checker, dan venue style checker (IEEE/ACM/Elsevier) karena di luar fokus utama NaskahGuard.<br>- Implementasi Winnowing karakter-level diganti dengan Winnowing berbasis token kata agar lebih tahan perubahan spasi/tanda baca dan mendukung mapping kata unik. |
+| **Awesome Academic Skills** | https://github.com/O0000-code/awesome-academic-skills | CC0-1.0 | Direktori referensi lokal. | - Kurasi terstruktur untuk pencarian literatur dan parsing dokumen akademik. | - Tidak menginstal seluruh daftar (222 skill); hanya memilih skill yang relevan. |
+| **MinerU-Skill** | https://github.com/nebutra/mineru-skill | MIT | Terpasang di `.agents/skills/mineru`. | - Referensi alur ekstraksi PDF terstruktur dan pemisahan engine lokal vs cloud. | - Pemanggilan MinerU Cloud API tidak diaktifkan secara default demi privasi dokumen (local-first). Hanya opsi eksplisit di masa depan setelah persetujuan pengguna. |
+| **AI Skill Scholar** | https://github.com/dsebastien/ai-skill-scholar | MIT | Terpasang di `.agents/skills/scholar-search`. | - Pemanfaatan OpenAlex `/works` tanpa API key dengan *polite pool* (`mailto`), ekstraksi metadata OA PDF, DOI, dan abstrak terbalik. | - Skill `literature-review` dan `scholar-citations` tidak dipasang karena fokus kebutuhan adalah `scholar-search`. |
+| **Tufte Data Viz** | https://github.com/caylent/tufte-data-viz | MIT | Terpasang di `.agents/skills/tufte-data-viz`. | - Prinsip rasio data-ink tinggi, penghapusan border atas/kanan dan gridline berlebih, label langsung, latar off-white (`#fffff8` / `#151515`), serta konfigurasi Recharts & SVG yang bersih. | - Tidak ada; aturan diterapkan langsung pada komponen analitik dan SVG laporan. |
+| **UI/UX Pro Max** | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill | MIT | Terpasang di `.agents/skills/ui-ux-pro-max`. | - Hierarki aksesibilitas WCAG (kontras >= 4.5:1 teks, fokus keyboard jelas, label tidak hanya warna), token warna semantik tema terang/gelap, dan layout responsif. | - Preset animasi dekoratif berlebihan tidak digunakan demi menjaga fokus alat akademik profesional. |
+
+## 2. Catatan Evaluasi Noplag Engine Secara Khusus
+
+1. **Struktur Database**: Menggunakan tabel `tenants`, `documents`, `chunks` (`fingerprints bigint[]` + indeks GIN), `chunks_text`, `checks`, dan `check_sources`.
+2. **Retrieval & Alignment**: Memisahkan fase retrieval L1 (irisan fingerprint dengan anggaran DF agar frasa umum tidak membanjiri pool kandidat) dan alignment L0 (seed-and-extend lalu merge interval).
+3. **Kesesuaian untuk NaskahGuard**: Sangat kuat sebagai fondasi Lapisan 1 & 2 (*Exact* dan *Near-Exact*). Karena lingkungan target Windows saat ini tidak memiliki PostgreSQL/Docker dan berjalan pada Python 3.10.11, NaskahGuard mengimplementasikan mesin internal Python yang mengadopsi algoritma identik dengan penyimpanan fingerprint portabel (SQLite/PostgreSQL), serta menyediakan `app/engine/noplag_adapter.py` yang dibatasi pada alamat loopback (`127.0.0.1`/`localhost`) sebagai opsi integrasi service internal.
