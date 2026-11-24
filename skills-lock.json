@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "skills": {
+    "mineru": {
+      "source": "Nebutra/MinerU-Skill",
+      "commit": "02433d814f3da2a81b59cf9b8f3b8430aa05b21b",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "5bf0b279aa6e9c792d681f11a100e82b09455f9fb5c88c8283bdac07761308ca",
+      "installMode": "copy"
+    },
+    "scholar-search": {
+      "source": "dsebastien/ai-skill-scholar",
+      "commit": "15ce494a761232f68610b261c9e4c8001e2c83fd",
+      "sourceType": "github",
+      "skillPath": "skills/scholar-search/SKILL.md",
+      "computedHash": "2630ac875a80bd2902e0c682f6f29d8e33df026ea76f58fad4af8cf7406a4596",
+      "installMode": "copy"
+    },
+    "tufte-data-viz": {
+      "source": "caylent/tufte-data-viz",
+      "commit": "080e2fabec52346b8d7aaa47723a55daa0738447",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "2a01bd7c2871de600ea1b43fda92c904eb7632c8a66a1aaac7f54847ab0ecb46",
+      "installMode": "copy"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "cc7b20d85d64d8fa022292cfad731995d3cd4eeb",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "b2defbac0cde30996f120c953d243b5ccd396c55e550a98a08d4206eaadac670",
+      "installMode": "copy"
+    }
+  }
+}

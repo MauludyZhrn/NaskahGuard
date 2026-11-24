@@ -1,0 +1,508 @@
+{
+  "total_cases": 12,
+  "layer_summary": {
+    "EXACT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "tp": 133,
+      "fp": 0,
+      "fn": 0,
+      "tn": 87
+    },
+    "NEAR_EXACT": {
+      "precision": 0.9805,
+      "recall": 0.9934,
+      "f1": 0.9869,
+      "fpr": 0.0333,
+      "fnr": 0.0066,
+      "tp": 151,
+      "fp": 3,
+      "fn": 1,
+      "tn": 87
+    },
+    "LEXICAL": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "fpr": 0.0,
+      "fnr": 0.0,
+      "tp": 15,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0
+    }
+  },
+  "cases": [
+    {
+      "case_id": 1,
+      "name": "Dua dokumen identik",
+      "status": "COMPLETED",
+      "similarity_index": 100.0,
+      "raw_similarity": 100.0,
+      "exact_metrics": {
+        "tp": 49,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 49,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 85.74,
+      "peak_memory_kb": 767.6
+    },
+    {
+      "case_id": 2,
+      "name": "Beberapa kalimat sama",
+      "status": "COMPLETED",
+      "similarity_index": 37.31,
+      "raw_similarity": 37.31,
+      "exact_metrics": {
+        "tp": 25,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 25,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 123.46,
+      "peak_memory_kb": 602.0
+    },
+    {
+      "case_id": 3,
+      "name": "Modifikasi kata ringan (Near-Exact)",
+      "status": "COMPLETED",
+      "similarity_index": 81.82,
+      "raw_similarity": 81.82,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 18,
+        "fp": 3,
+        "fn": 0,
+        "precision": 0.8571,
+        "recall": 1.0,
+        "f1": 0.9231,
+        "fpr": 0.75,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 114.93,
+      "peak_memory_kb": 452.2
+    },
+    {
+      "case_id": 4,
+      "name": "Paragraf dengan sinonim (Lexical)",
+      "status": "COMPLETED",
+      "similarity_index": 0.0,
+      "raw_similarity": 0.0,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 15,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 115.83,
+      "peak_memory_kb": 434.0
+    },
+    {
+      "case_id": 5,
+      "name": "Kesamaan makna / parafrase berat",
+      "status": "COMPLETED",
+      "similarity_index": 0.0,
+      "raw_similarity": 0.0,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 130.63,
+      "peak_memory_kb": 434.1
+    },
+    {
+      "case_id": 6,
+      "name": "Kutipan langsung dengan sitasi",
+      "status": "COMPLETED",
+      "similarity_index": 0.0,
+      "raw_similarity": 48.08,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 134.19,
+      "peak_memory_kb": 495.0
+    },
+    {
+      "case_id": 7,
+      "name": "Daftar pustaka yang sama",
+      "status": "COMPLETED",
+      "similarity_index": 0.0,
+      "raw_similarity": 55.32,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 116.13,
+      "peak_memory_kb": 525.8
+    },
+    {
+      "case_id": 8,
+      "name": "Frasa umum akademik",
+      "status": "COMPLETED",
+      "similarity_index": 0.0,
+      "raw_similarity": 0.0,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 142.33,
+      "peak_memory_kb": 561.4
+    },
+    {
+      "case_id": 9,
+      "name": "Dua sumber overlap",
+      "status": "COMPLETED",
+      "similarity_index": 54.35,
+      "raw_similarity": 54.35,
+      "exact_metrics": {
+        "tp": 25,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 25,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 126.5,
+      "peak_memory_kb": 547.8
+    },
+    {
+      "case_id": 10,
+      "name": "Simulasi hasil OCR buruk",
+      "status": "COMPLETED",
+      "similarity_index": 85.71,
+      "raw_similarity": 85.71,
+      "exact_metrics": {
+        "tp": 18,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 18,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.9474,
+        "f1": 0.973,
+        "fpr": 0.0,
+        "fnr": 0.0526
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 113.25,
+      "peak_memory_kb": 429.5
+    },
+    {
+      "case_id": 11,
+      "name": "Tanpa sumber pembanding",
+      "status": "COMPLETED",
+      "similarity_index": 0.0,
+      "raw_similarity": 0.0,
+      "exact_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 97.74,
+      "peak_memory_kb": 315.2
+    },
+    {
+      "case_id": 12,
+      "name": "Dokumen multibahasa (ID + EN)",
+      "status": "COMPLETED",
+      "similarity_index": 43.24,
+      "raw_similarity": 43.24,
+      "exact_metrics": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "near_exact_combined_metrics": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "lexical_metrics": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "fpr": 0.0,
+        "fnr": 0.0
+      },
+      "elapsed_ms": 212.11,
+      "peak_memory_kb": 507.0
+    }
+  ]
+}

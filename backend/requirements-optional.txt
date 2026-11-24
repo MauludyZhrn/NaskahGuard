@@ -1,0 +1,4 @@
+pytesseract>=0.3.13
+sentence-transformers>=3.0
+psycopg[binary]>=3.2
+pgvector>=0.3.5

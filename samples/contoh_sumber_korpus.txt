@@ -1,0 +1,9 @@
+CONTOH SINTETIS — BUKAN DATA PRODUKSI
+
+Artikel Referensi Korpus Lokal: Kecerdasan Buatan untuk Audit Naskah Akademik
+
+Pendeteksian kemiripan teks akademik memerlukan kombinasi pendekatan sidik jari dokumen berbasis winnowing dan penyelarasan urutan kata secara lokal. Metode winnowing bekerja dengan memecah aliran token menjadi k-gram lalu memilih nilai hash minimum paling kanan pada setiap jendela geser sehingga mampu mempertahankan sensitivitas tinggi terhadap penyalinan verbatim maupun modifikasi ringan.
+
+Selain penyalinan persis, perubahan urutan kata atau penggantian beberapa istilah dalam kalimat dapat ditemukan melalui pencocokan bibit tiga-gram yang dikelompokkan sepanjang diagonal kedekatan posisi. Pendekatan ini memungkinkan auditor menelusuri posisi tepat kecocokan pada naskah asli dan sumber pembanding tanpa mengorbankan transparansi perhitungan skor.
+
+Untuk menjamin keadilan penilaian, kata yang tumpang tindih di antara beberapa dokumen pembanding hanya dihitung satu kali ke dalam Similarity Index dan diatribusikan secara eksklusif kepada sumber berperingkat tertinggi.

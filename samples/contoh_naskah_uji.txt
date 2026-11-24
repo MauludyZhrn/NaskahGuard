@@ -1,0 +1,17 @@
+CONTOH SINTETIS — BUKAN DATA PRODUKSI
+
+BAB I PENDAHULUAN
+
+Latar belakang penelitian ini berangkat dari kebutuhan perguruan tinggi terhadap sistem audit integritas naskah yang bersifat lokal dan transparan.
+
+Metode winnowing bekerja dengan memecah aliran token menjadi k-gram lalu memilih nilai hash minimum paling kanan pada setiap jendela geser sehingga mampu mempertahankan sensitivitas tinggi terhadap penyalinan verbatim maupun modifikasi ringan.
+
+Pada implementasi NaskahGuard, pengguna dapat mengatur pengecualian daftar pustaka dan sitasi agar perhitungan persentase kemiripan berfokus pada isi utama karya ilmiah.
+
+BAB II PENUTUP
+
+Seluruh analisis pada bagian penutup ini disusun secara mandiri oleh peneliti sebagai penegasan pentingnya keterbukaan metode ilmiah.
+
+Daftar Pustaka
+
+Schleimer, S., Wilkerson, D. S., & Aiken, A. (2003). Winnowing: Local Algorithms for Document Fingerprinting.

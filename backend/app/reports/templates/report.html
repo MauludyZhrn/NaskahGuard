@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laporan Kemiripan {{ report.report_number }} — {{ report.app_name }}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #fffff8; color: #111827; margin: 0; padding: 32px; line-height: 1.55; }
+    .container { max-width: 980px; margin: 0 auto; }
+    header { border-bottom: 2px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+    h1 { margin: 0; font-size: 24px; font-family: Georgia, serif; }
+    .meta { font-size: 13px; color: #4b5563; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+    .card .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+    .card .val { font-size: 24px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .section { margin-bottom: 28px; }
+    h2 { font-size: 17px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: Georgia, serif; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .notice { background: #f8fafc; border-left: 4px solid #2563eb; padding: 12px 14px; font-size: 13px; margin: 12px 0; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-EXACT { background: #fee2e2; color: #991b1b; }
+    .badge-NEAR_EXACT { background: #ffedd5; color: #9a3412; }
+    .badge-LEXICAL { background: #fef9c3; color: #854d0e; }
+    .badge-SEMANTIC { background: #dbeafe; color: #1e40af; }
+    .excerpt { font-size: 12px; color: #374151; background: #f9fafb; padding: 6px 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>{{ report.app_name }} — Laporan Pemeriksaan Kemiripan</h1>
+        <div class="meta">Nomor Laporan: <strong>{{ report.report_number }}</strong> · Waktu Selesai: {{ report.finished_at or report.created_at }}</div>
+      </div>
+      <div class="meta">
+        Dokumen: <strong>{{ report.document.filename }}</strong> ({{ report.document.file_type | upper }}, {{ report.document.page_count }} hlm)
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Similarity Index (Adjusted)</div>
+        <div class="val">{{ "%.2f"|format(report.metrics.get("similarity_index", 0)) }}%</div>
+      </div>
+      <div class="card">
+        <div class="label">Raw Similarity</div>
+        <div class="val">{{ "%.2f"|format(report.metrics.get("raw_similarity", 0)) }}%</div>
+      </div>
+      <div class="card">
+        <div class="label">Kata Cocok / Diperiksa</div>
+        <div class="val">{{ report.metrics.get("matched_words", 0) }} / {{ report.metrics.get("eligible_words", 0) }}</div>
+      </div>
+      <div class="card">
+        <div class="label">Sumber Berkontribusi</div>
+        <div class="val">{{ report.metrics.get("sources_found", 0) }}</div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <strong>Kategori Operasional: {{ report.metrics.get("operational_category", {}).get("level", "-") }}</strong> —
+      {{ report.metrics.get("operational_category", {}).get("disclaimer", "") }}
+    </div>
+
+    <div class="section">
+      <h2>Metodologi &amp; Rincian Persentase</h2>
+      <p style="font-size: 13px;">Rumus utama: <code>SI = (Unique Matched Eligible Words / Total Eligible Words) × 100%</code>. Kata yang bertumpuk antar sumber hanya dihitung satu kali dengan atribusi eksklusif.</p>
+      {{ layer_svg | safe }}
+      <ul>
+        <li>Exact Match: <strong>{{ "%.2f"|format(report.metrics.get("exact_match_pct", 0)) }}%</strong></li>
+        <li>Near-Exact Match: <strong>{{ "%.2f"|format(report.metrics.get("near_exact_match_pct", 0)) }}%</strong></li>
+        <li>Lexical Match ({{ "masuk skor" if report.metrics.get("include_lexical_in_index") else "kandidat di luar skor utama" }}): <strong>{{ "%.2f"|format(report.metrics.get("lexical_match_pct", 0)) }}%</strong></li>
+        <li>Kandidat Semantik (tinjauan saja): <strong>{{ report.metrics.get("semantic_candidates_count", 0) }}</strong> segmen ({{ report.metrics.get("semantic_status", "-") }})</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Top Sumber &amp; Daftar Sumber Cocok</h2>
+      {{ sources_svg | safe }}
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Sumber</th>
+            <th>Tipe &amp; Status</th>
+            <th class="num">Kata Cocok (Eksklusif)</th>
+            <th class="num">Kontribusi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for src in report.sources %}
+          <tr>
+            <td>{{ src.rank }}</td>
+            <td>
+              <strong>{{ src.title }}</strong><br/>
+              <span class="meta">{{ src.authors | join(", ") }}{% if src.year %} ({{ src.year }}){% endif %}{% if src.doi %} · DOI: {{ src.doi }}{% endif %}</span>
+            </td>
+            <td>{{ src.source_type }}<br/><span class="meta">{{ src.access_status }}</span></td>
+            <td class="num">{{ src.matched_words_exclusive }}</td>
+            <td class="num">{{ "%.2f"|format(src.contribution_pct) }}%</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">Tidak ada sumber yang cocok.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Alur Pemeriksaan (Data Aktual)</h2>
+      <table>
+        <thead>
+          <tr><th>Tahap</th><th>Ringkasan Data Aktual</th></tr>
+        </thead>
+        <tbody>
+          {% for key, val in report.stage_counts.items() %}
+          <tr><td><strong>{{ key }}</strong></td><td><code>{{ val }}</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Contoh Kecocokan Teks (Maks. 20 Passage)</h2>
+      <table>
+        <thead>
+          <tr><th>Lapisan</th><th>Sumber</th><th>Cuplikan Dokumen</th><th>Cuplikan Sumber</th><th class="num">Kata</th></tr>
+        </thead>
+        <tbody>
+          {% for m in report.matches[:20] %}
+          <tr>
+            <td><span class="badge badge-{{ m.layer }}">{{ m.layer }}</span>{% if m.excluded_reason %}<br/><span class="meta">Dikecualikan: {{ m.excluded_reason }}</span>{% endif %}</td>
+            <td>{{ m.source_title }}{% if m.src_page %}<br/><span class="meta">Hlm. {{ m.src_page }}</span>{% endif %}</td>
+            <td><div class="excerpt">{{ m.sub_excerpt }}</div></td>
+            <td><div class="excerpt">{{ m.src_excerpt }}</div></td>
+            <td class="num">{{ m.matched_words }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">Tidak ada kecocokan teks yang tercatat.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Pernyataan Cakupan &amp; Keterbatasan Sistem</h2>
+      <div class="notice">
+        <p><strong>{{ report.coverage.get("statement", "") }}</strong></p>
+        <ul>
+          {% for note in report.coverage.get("notes", []) %}
+          <li>{{ note }}</li>
+          {% endfor %}
+          <li>NaskahGuard bukan pengganti Turnitin/iThenticate dan tidak mengklaim memiliki akses ke basis data tertutup penerbit/institusi.</li>
+          <li>Dokumen pindaian bergantung pada ketersediaan OCR lokal (metode ekstraksi: {{ report.document.extraction_method }}, keyakinan: {{ "%.0f"|format(report.document.extraction_confidence * 100) }}%).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
