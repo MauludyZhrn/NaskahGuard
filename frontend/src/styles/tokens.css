@@ -1,0 +1,179 @@
+/* NaskahGuard Design Tokens — Phase 9 Unified Tokens (ui-ux-pro-max + shadcn/ui) */
+
+:root {
+  /* Brand & Semantic Palette (Light Mode) */
+  --color-primary: #1e3a5f;
+  --color-primary-hover: #162d4b;
+  --color-on-primary: #ffffff;
+  --color-primary-soft: #e8eff8;
+  --color-primary-text: #1e3a5f;
+
+  /* Direct aliases used across pages */
+  --primary: var(--color-primary);
+  --primary-soft: var(--color-primary-soft);
+  --secondary: #334155;
+  --accent: #b45309;
+
+  --color-secondary: #334155;
+  --color-accent: #b45309;
+  --color-accent-soft: #fef3c7;
+
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-alt: #f1f5f9;
+  --surface-elevated: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  /* HSL mappings for shadcn/ui & Radix primitives */
+  --tw-background: 210 40% 98%;
+  --tw-foreground: 222 47% 11%;
+  --tw-card: 0 0% 100%;
+  --tw-card-foreground: 222 47% 11%;
+  --tw-popover: 0 0% 100%;
+  --tw-popover-foreground: 222 47% 11%;
+  --tw-primary: 214 52% 25%;
+  --tw-primary-foreground: 0 0% 100%;
+  --tw-secondary: 210 40% 96%;
+  --tw-secondary-foreground: 215 25% 27%;
+  --tw-muted: 210 40% 96%;
+  --tw-muted-foreground: 215 16% 47%;
+  --tw-accent: 210 40% 94%;
+  --tw-accent-foreground: 222 47% 11%;
+  --tw-destructive: 0 72% 51%;
+  --tw-destructive-foreground: 0 0% 100%;
+  --tw-border: 214 32% 91%;
+  --tw-input: 214 32% 86%;
+  --tw-ring: 214 52% 25%;
+
+  /* Match Category Semantic Colors */
+  --exact-bg: rgba(220, 38, 38, 0.14);
+  --exact-border: #dc2626;
+  --exact-text: #991b1b;
+
+  --near-bg: rgba(234, 88, 12, 0.15);
+  --near-border: #ea580c;
+  --near-text: #9a3412;
+
+  --lexical-bg: rgba(202, 138, 4, 0.16);
+  --lexical-border: #ca8a04;
+  --lexical-text: #854d0e;
+
+  --semantic-bg: rgba(30, 58, 95, 0.12);
+  --semantic-border: #2563eb;
+  --semantic-text: #1e40af;
+
+  --excluded-bg: rgba(100, 116, 139, 0.14);
+  --excluded-border: #64748b;
+  --excluded-text: #334155;
+
+  --success-bg: rgba(22, 163, 74, 0.12);
+  --success-border: rgba(22, 163, 74, 0.35);
+  --success-text: #166534;
+
+  /* Spacing & Radii */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.14);
+
+  /* Typography */
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-doc: Georgia, "Palatino Linotype", Palatino, serif;
+  --font-serif: var(--font-doc);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Sidebar widths */
+  --sidebar-expanded: 260px;
+  --sidebar-collapsed: 72px;
+}
+
+[data-theme="dark"] {
+  --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
+  --color-on-primary: #0f172a;
+  --color-primary-soft: rgba(96, 165, 250, 0.16);
+  --color-primary-text: #93c5fd;
+
+  --primary: var(--color-primary);
+  --primary-soft: var(--color-primary-soft);
+  --secondary: #94a3b8;
+  --accent: #f59e0b;
+
+  --color-secondary: #94a3b8;
+  --color-accent: #f59e0b;
+  --color-accent-soft: rgba(245, 158, 11, 0.16);
+
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-alt: #263348;
+  --surface-elevated: #273449;
+  --border: #334155;
+  --border-strong: #475569;
+
+  --text: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  /* HSL mappings for shadcn/ui & Radix primitives (Dark Mode) */
+  --tw-background: 222 47% 11%;
+  --tw-foreground: 210 40% 96%;
+  --tw-card: 217 33% 17%;
+  --tw-card-foreground: 210 40% 96%;
+  --tw-popover: 217 33% 17%;
+  --tw-popover-foreground: 210 40% 96%;
+  --tw-primary: 213 94% 68%;
+  --tw-primary-foreground: 222 47% 11%;
+  --tw-secondary: 217 33% 22%;
+  --tw-secondary-foreground: 210 40% 96%;
+  --tw-muted: 217 33% 22%;
+  --tw-muted-foreground: 215 20% 65%;
+  --tw-accent: 217 33% 24%;
+  --tw-accent-foreground: 210 40% 96%;
+  --tw-destructive: 0 63% 55%;
+  --tw-destructive-foreground: 0 0% 100%;
+  --tw-border: 215 25% 27%;
+  --tw-input: 215 25% 32%;
+  --tw-ring: 213 94% 68%;
+
+  --exact-bg: rgba(239, 68, 68, 0.24);
+  --exact-border: #f87171;
+  --exact-text: #fecaca;
+
+  --near-bg: rgba(249, 115, 22, 0.24);
+  --near-border: #fb923c;
+  --near-text: #fed7aa;
+
+  --lexical-bg: rgba(234, 179, 8, 0.22);
+  --lexical-border: #facc15;
+  --lexical-text: #fef08a;
+
+  --semantic-bg: rgba(96, 165, 250, 0.22);
+  --semantic-border: #60a5fa;
+  --semantic-text: #bfdbfe;
+
+  --excluded-bg: rgba(148, 163, 184, 0.2);
+  --excluded-border: #94a3b8;
+  --excluded-text: #cbd5e1;
+
+  --success-bg: rgba(34, 197, 94, 0.18);
+  --success-border: rgba(34, 197, 94, 0.4);
+  --success-text: #86efac;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}

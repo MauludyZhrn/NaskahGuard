@@ -14,9 +14,9 @@ export const SimilarityGauge: React.FC<SimilarityGaugeProps> = ({
   thresholdHigh,
 }) => {
   const clamped = Math.max(0, Math.min(100, value));
-  const r = 68;
-  const cx = 90;
-  const cy = 84;
+  const r = 46;
+  const cx = 64;
+  const cy = 58;
   const circumference = Math.PI * r;
   const filled = (clamped / 100) * circumference;
 
@@ -25,36 +25,36 @@ export const SimilarityGauge: React.FC<SimilarityGaugeProps> = ({
   else if (clamped >= thresholdLow) strokeColor = "#ea580c";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }} aria-label={`Similarity Index ${clamped.toFixed(2)} persen, kategori ${level}`}>
-      <svg width="180" height="106" viewBox="0 0 180 106">
+    <div
+      style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}
+      aria-label={`Similarity Index ${clamped.toFixed(2)} persen, kategori ${level}`}
+    >
+      <svg width="128" height="74" viewBox="0 0 128 74">
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
           stroke="var(--border)"
-          strokeWidth="12"
+          strokeWidth="9"
           strokeLinecap="round"
         />
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
           fill="none"
           stroke={strokeColor}
-          strokeWidth="12"
+          strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${circumference}`}
         />
         <text
           x={cx}
-          y={cy - 14}
+          y={cy - 6}
           textAnchor="middle"
-          fontSize="24"
+          fontSize="18"
           fontWeight="700"
           fill="var(--text)"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
           {clamped.toFixed(2)}%
-        </text>
-        <text x={cx} y={cy + 6} textAnchor="middle" fontSize="12" fill="var(--text-secondary)">
-          Kategori: {level}
         </text>
       </svg>
     </div>

@@ -48,11 +48,60 @@ export interface CheckSettings {
   exclude_common_phrases: boolean;
   min_match_words: number;
   include_lexical_in_index: boolean;
+  include_local_corpus?: boolean;
   use_external_sources: boolean;
+  enable_academic_search: boolean;
+  enable_web_search: boolean;
+  enable_oai_sources?: boolean;
+  enable_fulltext_download: boolean;
+  enable_browser_crawler: boolean;
+  search_intensity?: "QUICK" | "BALANCED" | "DEEP";
+  max_search_queries: number;
+  max_crawled_urls: number;
+  max_download_mb: number;
+  search_language: "all" | "id" | "en";
   external_providers: string[];
   compare_with_previous_submissions: boolean;
   add_to_corpus_after_check: boolean;
   use_noplag_engine: boolean;
+}
+
+export interface ProviderHealthItem {
+  id: string;
+  name: string;
+  type: string;
+  default_enabled: boolean;
+  full_text_capable: boolean;
+  indexed_documents?: number;
+  rate_limit?: string;
+  status: string;
+  configured: boolean;
+  enabled: boolean;
+  reachable?: boolean | null;
+  last_checked?: string | null;
+  health: "healthy" | "ready" | "degraded" | "unconfigured";
+  request_count: number;
+  result_count: number;
+  timeout_count: number;
+  last_successful_request: string | null;
+  last_error: string | null;
+}
+
+export interface OAIRepositoryItem {
+  id: string;
+  name: string;
+  base_url: string;
+  repo_type: string;
+  enabled: boolean;
+  identified_name: string | null;
+  metadata_prefix: string;
+  last_harvested_at: string | null;
+  last_datestamp: string | null;
+  records_harvested: number;
+  fulltext_indexed: number;
+  status: string;
+  last_error: string | null;
+  created_at: string | null;
 }
 
 export interface CheckSummary {
@@ -83,6 +132,10 @@ export interface ReportSource {
   year: number | null;
   doi: string | null;
   url: string | null;
+  canonical_url?: string | null;
+  alternate_urls?: string[];
+  license?: string | null;
+  indexing_status?: string;
   source_type: string;
   access_status: string;
   provider: string;
@@ -91,6 +144,50 @@ export interface ReportSource {
   contribution_pct: number;
   layers: Record<string, number>;
   can_download_file: boolean;
+}
+
+export interface SourceAcquisitionItem {
+  id: number;
+  check_id?: string;
+  provider: string;
+  query: string;
+  title: string;
+  authors?: string[];
+  year?: number | null;
+  doi?: string | null;
+  source_url?: string | null;
+  canonical_url?: string | null;
+  source_type?: string;
+  file_type?: string | null;
+  license?: string | null;
+  status: string;
+  used_playwright: boolean;
+  document_id?: string | null;
+  error?: string | null;
+  duration_ms: number;
+  created_at?: string | null;
+}
+
+export interface SearchCoverageAnalytics {
+  total_search_queries: number;
+  total_provider_responses: number;
+  total_unique_urls_found: number;
+  total_pages_crawled: number;
+  total_fulltext_fetched: number;
+  total_fulltext_indexed: number;
+  total_metadata_only: number;
+  total_inaccessible_sources: number;
+  total_verified_matching_sources: number;
+  providers_failed: string[];
+  generated_queries?: Array<{ query: string; kind: string; chapter: string; score: number }>;
+  indicators?: {
+    local_corpus_coverage: string;
+    academic_database_coverage: string;
+    public_web_coverage: string;
+    fulltext_availability: string;
+    external_search_coverage: string;
+  };
+  coverage_disclaimer?: string;
 }
 
 export interface ReportMatch {
@@ -165,6 +262,36 @@ export interface FullReport {
       threshold_high: number;
       disclaimer: string;
     };
+    score_explanation?: {
+      formula: string;
+      adjusted_formula?: string;
+      raw_formula: string;
+      raw_similarity?: number;
+      adjusted_similarity?: number;
+      unrounded_raw_similarity?: number;
+      unrounded_adjusted_similarity?: number;
+      unrounded_exact_pct?: number;
+      unrounded_near_exact_pct?: number;
+      rounding_note?: string;
+      matched_eligible_words?: number;
+      unique_matched_words?: number;
+      raw_matched_words?: number;
+      eligible_words: number;
+      total_words: number;
+      excluded_words: number;
+      exclusion_breakdown?: Record<string, number>;
+      exact_words?: number;
+      exact_match_words?: number;
+      exact_match_pct?: number;
+      near_exact_words?: number;
+      near_exact_match_words?: number;
+      near_exact_match_pct?: number;
+      lexical_words?: number;
+      overlap_tokens_removed?: number;
+      raw_vs_adjusted_reason?: string;
+      raw_vs_adjusted_diff_reason?: string;
+    };
+    stage_timings_ms?: Record<string, number>;
   };
   coverage: {
     level: string;
@@ -175,6 +302,20 @@ export interface FullReport {
     external_sources_enabled: boolean;
     notes: string[];
     statement: string;
+    source_metrics?: {
+      search_results_count?: number;
+      total_sources_discovered: number;
+      total_urls_found: number;
+      fulltext_downloaded: number;
+      fulltext_indexed: number;
+      fulltext_compared: number;
+      metadata_only_sources: number;
+      inaccessible_sources: number;
+      failed_acquisitions?: number;
+      matching_sources: number;
+      verified_contributing_sources: number;
+    };
+    search_coverage?: SearchCoverageAnalytics;
     metadata_only_items?: Array<{
       provider: string;
       external_id: string;
@@ -202,6 +343,7 @@ export interface FullReport {
     error: string | null;
     duration_ms: number;
   }>;
+  acquisitions?: SourceAcquisitionItem[];
 }
 
 export interface ViewerSegment {
