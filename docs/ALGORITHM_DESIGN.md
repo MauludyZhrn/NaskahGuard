@@ -67,3 +67,14 @@ flowchart TD
 ### D. Lexical & Semantic (Lapisan 3 & 4)
 - **Lapisan 3 (Lexical)**: Kalimat submission dengan cakupan exact/near `< 50%` dan panjang `>= 6` kata dibandingkan menggunakan `TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5))` dengan ambang cosine `>= 0.70`. Kandidat diambil dari pool L1/L2 ditambah top-5 dokumen dari ranking BM25 (`rank-bm25`).
 - **Lapisan 4 (Semantic)**: Nonaktif secara default. Bila diaktifkan dan pustaka `sentence-transformers` terpasang, menggunakan model multibahasa (`paraphrase-multilingual-MiniLM-L12-v2`) dengan ambang cosine `>= 0.80`. Hasil Lapisan 4 **tidak pernah** masuk ke Similarity Index utama dan dilabeli sebagai kandidat untuk ditinjau.
+
+
+---
+
+## Pembaruan Algoritma Phase 9 — Morfologi Bahasa Indonesia & Audit Presisi Pembulatan
+
+1. **Morfologi & Sinonim Bahasa Indonesia (`indonesian_nlp.py`)**:
+   - Menangani prefiks/sufiks Bahasa Indonesia (`meng-`, `mem-`, `meny-`, `ber-`, `ter-`, `-kan`, `-an`, `-i`, `-nya`) dan padanan kata akademik umum pada pencocokan kalimat `LEXICAL`.
+   - Menerapkan *technical-jargon guard* sehingga kesamaan istilah teknis semata (`regresi`, `validitas`, `algoritma`, `syariah`, dll.) tidak pernah melampaui ambang kecocokan tanpa kesamaan kata kerja/konten predikatif.
+2. **Transparansi Nilai Sebelum Pembulatan (`scoring.py`)**:
+   - Menyimpan nilai 6 desimal sebelum pembulatan (`unrounded_adjusted_similarity`, `unrounded_exact_pct`, `unrounded_near_exact_pct`) dan menghasilkan `rounding_note` otomatis apabila penjumlahan persentase komponen terbulat berbeda `±0,01%` dari `Adjusted Similarity Index` (seperti pada kasus `408 / 5.973`: `Exact 290/5973 = 4,86%` + `Near 118/5973 = 1,98%` vs `408/5973 = 6,83%`).

@@ -30,8 +30,10 @@ Seluruh endpoint berada di bawah prefix `/api`. Jika `API_TOKEN` diatur pada env
 - `GET /api/checks/{id}/export.html` — Unduh laporan HTML mandiri dengan grafik SVG inline.
 - `GET /api/checks/{id}/export.json` — Unduh laporan JSON terstruktur.
 
-## 5. Dasbor, Provider, Pengaturan, dan Audit
+## 5. Dasbor, Provider, Monitor Penemuan, OAI-PMH, Pengaturan, dan Audit
 - `GET /api/dashboard` — Agregasi nyata jumlah dokumen diperiksa, rata-rata SI, laporan terbaru, statistik korpus, dan aktivitas audit terkini.
-- `GET /api/providers` — Status adapter lokal dan eksternal (OpenAlex, Crossref, arXiv, PMC, Noplag opsional).
+- `GET /api/providers` — Status adapter lokal, akademik (OpenAlex, Europe PMC, arXiv, Crossref), web search (SearXNG, Official Web API), Playwright crawler, OAI-PMH, dan Noplag opsional.
+- `GET /api/providers/monitor` — Data pemantauan langsung kueri, akuisisi URL (`source_acquisitions`), dan status indeksasi (`?check_id=...`).
+- `GET /api/oai/repositories`, `POST /api/oai/repositories`, `POST /api/oai/repositories/{id}/verify`, `POST /api/oai/repositories/{id}/harvest`, `DELETE /api/oai/repositories/{id}` — Manajemen dan panen repositori akademik Indonesia berbasis OAI-PMH 2.0.
 - `GET /api/settings` & `PUT /api/settings` — Baca dan ubah pengaturan default pengecualian serta ambang batas operasional.
 - `GET /api/audit` — Log aktivitas audit sistem.

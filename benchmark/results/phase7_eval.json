@@ -1,0 +1,22 @@
+{
+  "search_retrieval": {
+    "queries_executed": 1,
+    "candidate_records": 4,
+    "source_retrieval_precision": 0.5,
+    "search_and_acquisition_latency_ms": 58.25
+  },
+  "crawling_and_extraction": {
+    "fulltext_indexed": 2,
+    "fulltext_acquisition_success_rate": 1.0,
+    "metadata_only_count": 2,
+    "access_denied_count": 0
+  },
+  "similarity_matching": {
+    "similarity_index": 78.67,
+    "exact_match_pct": 66.67,
+    "near_exact_match_pct": 12.0,
+    "sources_matched": 2,
+    "total_matches": 4,
+    "matching_processing_time_ms": 65.02
+  }
+}

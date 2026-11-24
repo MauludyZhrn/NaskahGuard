@@ -1,0 +1,112 @@
+{
+  "mode": "live_internet_provider_verification",
+  "timestamp": "2026-11-24T21:26:51.392607+00:00",
+  "public_test_query": "winnowing document fingerprinting",
+  "playwright_isolated_browser": {
+    "engine": "playwright_chromium",
+    "configured": true,
+    "reachable": true,
+    "isolated_context": true,
+    "latency_ms": 2803,
+    "message": "Chromium headless terisolasi siap (2803 ms)."
+  },
+  "providers": [
+    {
+      "provider": "openalex",
+      "configured": true,
+      "reachable": true,
+      "status": "OK",
+      "query_count": 1,
+      "candidate_count": 5,
+      "url_count": 10,
+      "latency_ms": 1754,
+      "error": null
+    },
+    {
+      "provider": "crossref",
+      "configured": true,
+      "reachable": true,
+      "status": "OK",
+      "query_count": 1,
+      "candidate_count": 5,
+      "url_count": 5,
+      "latency_ms": 1169,
+      "error": null
+    },
+    {
+      "provider": "europe_pmc",
+      "configured": true,
+      "reachable": true,
+      "status": "OK",
+      "query_count": 1,
+      "candidate_count": 5,
+      "url_count": 24,
+      "latency_ms": 1069,
+      "error": null
+    },
+    {
+      "provider": "doaj",
+      "configured": true,
+      "reachable": true,
+      "status": "OK",
+      "query_count": 1,
+      "candidate_count": 5,
+      "url_count": 5,
+      "latency_ms": 452,
+      "error": null
+    },
+    {
+      "provider": "arxiv",
+      "configured": true,
+      "reachable": true,
+      "status": "OK",
+      "query_count": 1,
+      "candidate_count": 5,
+      "url_count": 10,
+      "latency_ms": 255,
+      "error": null
+    },
+    {
+      "provider": "searxng",
+      "configured": false,
+      "reachable": false,
+      "status": "NOT_CONFIGURED",
+      "query_count": 0,
+      "candidate_count": 0,
+      "url_count": 0,
+      "latency_ms": 0,
+      "error": null
+    },
+    {
+      "provider": "web_api",
+      "configured": false,
+      "reachable": false,
+      "status": "NOT_CONFIGURED",
+      "query_count": 0,
+      "candidate_count": 0,
+      "url_count": 0,
+      "latency_ms": 0,
+      "error": null
+    }
+  ],
+  "live_end_to_end_examination": {
+    "executed": true,
+    "check_status": "COMPLETED",
+    "queries_executed": 15,
+    "provider_responses": 32,
+    "unique_urls_found": 58,
+    "fulltext_fetched": 3,
+    "fulltext_indexed": 3,
+    "metadata_only": 29,
+    "similarity_index_pct": 0.0,
+    "stage_timings_ms": {
+      "query_generation_ms": 1,
+      "provider_search_ms": 46165,
+      "crawling_and_download_ms": 3846,
+      "extraction_and_indexing_ms": 3051,
+      "source_discovery_ms": 53071,
+      "total_pipeline_ms": 53522
+    },
+    "total_elapsed_ms": 53535
+  }
+}

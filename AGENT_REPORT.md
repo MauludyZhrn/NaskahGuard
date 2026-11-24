@@ -27,7 +27,17 @@ Laporan log pengembangan proyek **NaskahGuard** (Academic Plagiarism & Similarit
 - Frontend React + TypeScript + Vite (`frontend/`) berbahasa Indonesia penuh (mode terang & gelap, responsif, prinsip Tufte & aksesibilitas): Dasbor, Pemeriksaan Baru, Riwayat Pemeriksaan, Pustaka Dokumen, Korpus Sumber, Laporan Kemiripan, Detail Laporan 6 tab (Ringkasan, Perbandingan Dokumen dua panel sinkron, Sumber, Analitik Recharts, Alur Pemeriksaan 12 tahap data aktual, Ekspor), dan Pengaturan.
 
 ### Fase 6 — Pengujian, Benchmark, & Verifikasi (Selesai)
-- **Pytest (`backend/.venv/Scripts/python.exe -m pytest -q`)**: **16 passed** (validasi keamanan/magic-bytes/traversal, ingesti PDF/DOCX/TXT + invarian offset, Winnowing, Exact, Near-Exact, overlap attribution, exclusions, mock provider adapters, end-to-end API termasuk ekspor PDF & penghapusan menyeluruh, serta penegakan `API_TOKEN`).
+- **Pytest (`backend/.venv/Scripts/python.exe -m pytest -v`)**: **23 passed** (mencakup seluruh 17 tes Fase 1–6 ditambah 6 tes Fase 7: SSRF guard, Intelligent Query Generator, HTML/XML extraction, OpenAlex + Europe PMC + SearXNG + Source Deduplication, OAI-PMH Harvester & Registry API, serta isolated Playwright Chromium context).
+- Perbaikan pada `build_viewer_payload` (`backend/app/reports/builder.py`): memastikan segmen teks yang masuk masker pengecualian (seperti `BIBLIOGRAPHY`) selalu diprioritaskan tampil sebagai `EXCLUDED` pada viewer agar konsisten dengan perhitungan Adjusted SI.
+
+### Fase 7 — Global Web & Academic Source Intelligence + OAI-PMH Harvester (Selesai)
+- **Audit & Diagnosis**: Terdokumentasi pada [docs/research/PHASE7_DIAGNOSIS.md](docs/research/PHASE7_DIAGNOSIS.md).
+- **Skema & Migrasi Alembic (`0002_phase7_discovery.py`)**: Penambahan kolom deduplikasi pada `documents` (`canonical_url`, `normalized_title`, `license`, `indexing_status`, `alternate_urls`), tabel `source_acquisitions`, dan tabel `oai_repositories`.
+- **Intelligent Query Generator (`app/sources/query_generator.py`)**: Mengekstrak kueri frasa eksak, keyword TF-IDF, dan DOI secara progresif dari zona `BODY` saja (bebas daftar pustaka/frasa umum).
+- **Provider & Akuisisi Full-Text**: Upgrade `OpenAlexProvider` (`locations` + OA + Content API), penambahan `EuropePMCProvider` (full-text JATS XML), pelestarian `PubMedCentralProvider` & `ArxivProvider` & `CrossrefProvider`, penambahan `SearXNGWebSearchProvider` & `OfficialWebSearchAPIProvider` (`app/sources/web_search.py`), SSRF defense-in-depth (`app/sources/ssrf.py`), Playwright Chromium crawler terisolasi + HTML boilerplate stripping (`app/sources/crawler.py`, `app/ingestion/html_extractor.py`, `app/ingestion/xml_extractor.py`), dan deduplikasi multi-sinyal (`app/sources/dedup.py`).
+- **OAI-PMH Harvester (`app/sources/oai_pmh.py`, `app/api/oai.py`)**: Mendukung `Identify`, `ListMetadataFormats`, `ListSets`, `ListRecords` dengan `resumptionToken`, `GetRecord`, panen inkremental berbasis datestamp, serta indeksasi PDF publik ke korpus lokal.
+- **Upgrade Frontend**: Pengaturan pencarian eksternal pada `NewCheckPage`, halaman baru `Monitor Penemuan` (`DiscoveryMonitorPage`), manajemen repositori OAI-PMH di `CorpusPage`, serta tab `Bukti Pencarian Internet` dan `Cakupan Pencarian` pada `ReportDetailPage`.
+- **Evaluasi Phase 7 (`benchmark/run_phase7_eval.py`)**: `fulltext_acquisition_success_rate=1.0`, `similarity_index=78.67%`, `sources_matched=2`.
 - **Benchmark 12 Kasus Sintetis (`backend/.venv/Scripts/python.exe benchmark/run_benchmark.py`)**:
   - `EXACT`: Precision = **1.0000**, Recall = **1.0000**, F1 = **1.0000**, FPR = **0.0000**, FNR = **0.0000**.
   - `NEAR_EXACT` (gabungan): Precision = **0.9805**, Recall = **0.9934**, F1 = **0.9869**, FPR = **0.0333**, FNR = **0.0066**.
@@ -49,3 +59,46 @@ Laporan log pengembangan proyek **NaskahGuard** (Academic Plagiarism & Similarit
 1. Uji migrasi dan performa indeks GIN `pg_trgm` serta `bigint[]` pada instance PostgreSQL 15+.
 2. Pasang Tesseract OCR (`ind+eng`) dan `sentence-transformers` bila membutuhkan pemindaian PDF gambar dan pencarian kandidat semantik Lapisan 4.
 3. Lakukan evaluasi lanjutan pada korpus publik beranotasi besar seperti PAN-PC-11 atau repositori ilmiah lokal kampus.
+
+
+---
+
+## Phase 8 — Product Refinement, UI/UX Redesign & Search Intelligence Optimization
+
+### Ringkasan Perubahan
+1. **UI/UX Redesign (`ui-ux-pro-max`)**:
+   - Design token terpusat di `frontend/src/styles/tokens.css` & `frontend/src/styles/theme.css` (Primary `#1E3A5F`, Secondary `#334155`, Accent `#B45309`, Light `#F8FAFC`, Dark `#0F172A`/`#1E293B`).
+   - Collapsible Sidebar (`260px`/`72px`, persistensi `localStorage`, tooltip, grup navigasi independen, mobile drawer + backdrop) di `Layout.tsx`.
+   - Redesign `DashboardPage`, `NewCheckPage` (4 bagian + profil `QUICK/BALANCED/DEEP` + badge ketersediaan provider + accordion Pengaturan Lanjutan), `ReportDetailPage` (8-tab 1 baris + mobile select, accordion "Bagaimana skor dihitung?", 9 metrik sumber terpisah, Expand/Collapse All, `formatDuration`), dan `DiscoveryMonitorPage` (tabel kesehatan provider).
+   - Halaman baru `RepositoriesPage` (`/repositories`) dan `AnalyticsOverviewPage` (`/analytics`).
+2. **Search Intelligence & Backend Transparency**:
+   - `backend/app/sources/query_generator.py`: profil `QUICK`/`BALANCED`/`DEEP` dengan distribusi *round-robin* lintas bab.
+   - `backend/app/sources/ranking.py` & `backend/app/sources/cache.py`: peringkat relevansi kandidat & TTL cache URL/DOI.
+   - `backend/app/sources/registry.py`: konkurensi crawl terbatas (`ThreadPoolExecutor(max_workers=4)`) & `stage_timings_ms`.
+   - `backend/app/engine/scoring.py` & `pipeline.py`: `score_explanation` transparan & 9 metrik `source_metrics`.
+   - `backend/app/api/providers.py` & `dashboard.py`: telemetri kesehatan provider nyata & data tren dasbor.
+   - Opsional: `docker-compose.searxng.yml`.
+3. **Verifikasi & QA**:
+   - Backend pytest: **27/27 passed** (`5.64s`), termasuk `test_phase8_scoring_and_search.py`.
+   - Frontend `tsc --noEmit` & `npm run build`: **exit 0**.
+   - Phase 8 Search Benchmark (`benchmark/run_phase8_search_benchmark.py`): `P@5 = 0.80`, `R@5 = 1.00`, `0` kebocoran daftar pustaka, `23.64 ms` (mode deterministik offline; live internet dipisahkan secara eksplisit).
+   - Automated Playwright UI QA (`scripts/qa_ui_playwright.py`): **0** horizontal overflow pada `1280×800` & `768×1024`, **0** console/page error, sidebar `260px -> 72px` tersimpan setelah reload, accordion rumus tampil, Dark Mode aktif.
+
+
+---
+
+## Phase 9 — Advanced Design System, Browser Intelligence & Detection Engine Upgrade
+
+### Ringkasan Implementasi & Hasil Verifikasi
+1. **Agent Skills (`.agents/skills/`)**:
+   - Berhasil menginstal dan menerapkan `shadcn`, `magic-ui`, dan `scrapling-official` berdampingan dengan `ui-ux-pro-max`, `mineru`, `scholar-search`, dan `tufte-data-viz`.
+2. **Design System Modernization & Perbaikan Halaman Laporan**:
+   - Integrasi non-destruktif Tailwind CSS (`preflight: false` + pemetaan variabel HSL Light/Dark), `components.json`, 17 komponen `shadcn/ui`, serta 2 komponen motion selektif `Magic UI` (`NumberTicker`, `BlurFade`) dengan dukungan penuh `prefers-reduced-motion`.
+   - **Perbaikan 6 Poin Laporan**: (1) Menghilangkan navigasi ganda desktop di seluruh 5 viewport (`1600px`, `1440px`, `1280px`, `768px`, `390px`), (2) Tata letak ringkasan skor proporsional, (3) Accordion *"Penjelasan Perhitungan Similarity"* lengkap dengan nilai presisi sebelum pembulatan & catatan selisih pembulatan `0,01%` (`408 / 5.973`), (4) 9 metrik transparansi sumber terpisah, (5) Expand/Collapse All dengan persistensi `localStorage`, (6) Paginasi tabel kecocokan, dialog detail sumber, & *sticky viewer toolbar*.
+3. **Browser Intelligence, Provider DOAJ & Verifikasi Live Internet**:
+   - `IsolatedPlaywrightExtractor` (`extract()` & `health_check()`) dengan follow otomatis `citation_pdf_url` OA; diadu secara empiris pada 22 URL terhadap `Crawl4AI` dan `Scrapling` (`100%` keberhasilan ekstraksi, `100%` penghapusan boilerplate, rata-rata `35,05 ms`).
+   - Penambahan `DOAJProvider` (`doaj.py`), perbaikan bug live `CrossrefProvider` (`date-parts: [[None]]`), dan endpoint diagnostik live `POST /api/providers/diagnostics`.
+   - **Verifikasi Live Internet Nyata**: `OpenAlex`, `Crossref`, `Europe PMC`, `DOAJ`, dan `arXiv` seluruhnya terverifikasi `OK`, serta pemeriksaan live end-to-end berhasil mengunduh dan mengindeks **3 artikel full-text OA nyata** ke SQLite dalam **53,5 detik** (`SearXNG` & `Official Web API` dilaporkan jujur sebagai `NOT_CONFIGURED`).
+4. **Morfologi Bahasa Indonesia, Audit Skor & Regresi Penuh**:
+   - `indonesian_nlp.py` meningkatkan deteksi parafrasa Bahasa Indonesia sekaligus menjaga `FPR = 0,00` pada jargon teknis (`F1 = 1,00` pada 12 skenario ground-truth).
+   - Pytest regresi offline: **31 passed, 1 skipped (`LIVE_NETWORK_TESTS`)**; Pytest live (`LIVE_NETWORK_TESTS=true`): **5 passed**; Frontend `tsc` + `vite build`: **exit 0**; Playwright UI QA 5 viewport: **exit 0** dengan 7 tangkapan layar di `docs/screenshots/phase9/`.

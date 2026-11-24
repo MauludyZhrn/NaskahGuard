@@ -59,3 +59,30 @@ backend\.venv\Scripts\python.exe scripts\smoke_test.py
 2. Nomor halaman pada berkas DOCX bersifat estimasi berbasis pemisah halaman eksplisit.
 3. Modul semantik dan OCR tidak aktif secara default kecuali dependensi opsional dipasang.
 4. Adapter PMC saat ini menyediakan pencarian metadata E-utilities; pengunduhan arsip XML OA penuh belum diaktifkan.
+
+
+---
+
+## Pembaruan Phase 8 — Product Refinement, UI/UX Redesign & Search Intelligence
+
+- **Desain UI/UX (`ui-ux-pro-max`)**: Design tokens terpusat (`tokens.css` & `theme.css`), Light & Dark Mode konsisten, **Collapsible Sidebar** (`260px`/`72px` + persistensi `localStorage` + mobile drawer), halaman baru **Repositori Akademik (`/repositories`)** dan **Analitik (`/analytics`)**, serta navigasi 8-tab laporan 1 baris responsif.
+- **Transparansi Skor & Cakupan**: Accordion **"Bagaimana skor dihitung?"** (rumus nyata backend, Exact/Near/Lexical, overlap removal, Raw vs Adjusted), 9 metrik sumber terpisah tanpa ambiguitas, format durasi manusiawi Bahasa Indonesia, dan rincian waktu tahapan (`stage_timings_ms`).
+- **Optimasi Intelijen Pencarian**: Multi-Query Generator berprofil (`QUICK` ≤ 8, `BALANCED` ≤ 24, `DEEP` ≤ 48) dengan distribusi per bab, Search Quality Ranking (`HIGHLY_RELEVANT`–`UNRELATED`), TTL cache URL/DOI, konkurensi crawl terbatas, telemetri kesehatan provider (`/api/providers`), serta panduan opsional [docker-compose.searxng.yml](docker-compose.searxng.yml).
+- **Dokumentasi Phase 8**: [UI_UX_DESIGN_SYSTEM.md](docs/UI_UX_DESIGN_SYSTEM.md), [SEARCH_OPTIMIZATION.md](docs/SEARCH_OPTIMIZATION.md), [SEARCH_BENCHMARK.md](docs/SEARCH_BENCHMARK.md), [FRONTEND_COMPONENT_GUIDE.md](docs/FRONTEND_COMPONENT_GUIDE.md), [PHASE8_QA_REPORT.md](docs/PHASE8_QA_REPORT.md), dan [PHASE8_SEARCH_AUDIT.md](docs/research/PHASE8_SEARCH_AUDIT.md).
+
+
+---
+
+## Pembaruan Phase 9 — Advanced Design System, Browser Intelligence & Detection Engine Upgrade
+
+- **Agent Skills Terintegrasi**: `ui-ux-pro-max`, `shadcn`, `magic-ui`, `scrapling-official`, `mineru`, `scholar-search`, dan `tufte-data-viz` aktif di `.agents/skills/`.
+- **Modernisasi UI/UX (`shadcn/ui` + `Magic UI` Selektif)**:
+  - Konfigurasi Tailwind non-destruktif (`components.json`, alias `@/*`, variabel semantik Light/Dark), 19 komponen primitif resmi `shadcn/ui`, serta motion mikro `NumberTicker` & `BlurFade` yang menghormati `prefers-reduced-motion`.
+  - **Perbaikan Laporan Kemiripan**: Penghapusan total navigasi ganda pada desktop (`1600px`, `1440px`, `1280px`, `768px`, `390px`), tata letak ringkasan skor proporsional, accordion **"Penjelasan Perhitungan Similarity"** (termasuk nilai presisi sebelum pembulatan & penjelasan selisih pembulatan `0,01%`), 9 kategori transparansi sumber terpisah, paginasi tabel kecocokan, dialog detail sumber, serta *sticky toolbar* pada viewer perbandingan.
+- **Browser Intelligence & Pencarian Live**:
+  - Antarmuka modular `IsolatedPlaywrightExtractor` (`extract()` & `health_check()`) dengan isolasi konteks penuh, follow otomatis `citation_pdf_url` OA, serta hasil benchmark 22 URL terhadap Crawl4AI & Scrapling.
+  - Penambahan provider Open Access **DOAJ** (`doaj.py`) dan endpoint diagnostik konektivitas nyata `POST /api/providers/diagnostics`.
+- **Mesin Deteksi Bahasa Indonesia & Performa**:
+  - Modul `indonesian_nlp.py` (imbuhan, sinonim akademik, urutan klausa, dan pelindung *false-positive* istilah teknis).
+  - Eksekusi kueri paralel lintas provider + 4 lapisan `TTLCache` + reuse koneksi HTTP.
+- **Dokumentasi Phase 9**: [PHASE9_BROWSER_AUDIT.md](docs/research/PHASE9_BROWSER_AUDIT.md), [PHASE9_SEARCH_DESIGN.md](docs/PHASE9_SEARCH_DESIGN.md), [PHASE9_DETECTION_DESIGN.md](docs/PHASE9_DETECTION_DESIGN.md), [PHASE9_PERFORMANCE.md](docs/PHASE9_PERFORMANCE.md), [PHASE9_UI_QA.md](docs/PHASE9_UI_QA.md), [PHASE9_BENCHMARK.md](docs/PHASE9_BENCHMARK.md), dan [THIRD_PARTY_COMPONENTS.md](docs/THIRD_PARTY_COMPONENTS.md).

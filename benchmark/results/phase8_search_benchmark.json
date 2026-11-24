@@ -1,0 +1,99 @@
+{
+  "benchmark_version": "phase8-v1",
+  "mode": "offline_deterministic_integration",
+  "live_internet_providers_tested": false,
+  "live_internet_note": "Benchmark ini dijalankan secara deterministik offline (mock/integration) tanpa klaim hasil live web; provider live (OpenAlex, Europe PMC, arXiv, Crossref, SearXNG) bergantung pada konektivitas jaringan host.",
+  "query_profiles": {
+    "QUICK": {
+      "count": 8,
+      "chapters_covered": 5,
+      "query_kinds": [
+        "distinctive_keywords",
+        "exact_phrase",
+        "ngram_phrase",
+        "similar_variation",
+        "title"
+      ],
+      "bibliography_leaked": false
+    },
+    "BALANCED": {
+      "count": 24,
+      "chapters_covered": 8,
+      "query_kinds": [
+        "academic_terminology",
+        "distinctive_keywords",
+        "exact_phrase",
+        "language_aware",
+        "ngram_phrase",
+        "similar_variation",
+        "title"
+      ],
+      "bibliography_leaked": false
+    },
+    "DEEP": {
+      "count": 30,
+      "chapters_covered": 8,
+      "query_kinds": [
+        "academic_terminology",
+        "distinctive_keywords",
+        "exact_phrase",
+        "language_aware",
+        "ngram_phrase",
+        "similar_variation",
+        "title"
+      ],
+      "bibliography_leaked": false
+    }
+  },
+  "deduplication": {
+    "input_candidates": 7,
+    "deduped_candidates": 6,
+    "duplicates_removed": 1,
+    "canonical_url_check": true
+  },
+  "ranking_quality": {
+    "precision_at_5": 0.8,
+    "recall_at_5": 1.0,
+    "ranked_candidates": [
+      {
+        "id": "rel-2",
+        "score": 0.8567,
+        "label": "HIGHLY_RELEVANT"
+      },
+      {
+        "id": "rel-1",
+        "score": 0.826,
+        "label": "HIGHLY_RELEVANT"
+      },
+      {
+        "id": "rel-3",
+        "score": 0.356,
+        "label": "RELEVANT"
+      },
+      {
+        "id": "rel-4",
+        "score": 0.242,
+        "label": "WEAK_CANDIDATE"
+      },
+      {
+        "id": "irr-1",
+        "score": 0.0,
+        "label": "UNRELATED"
+      },
+      {
+        "id": "irr-2",
+        "score": 0.0,
+        "label": "UNRELATED"
+      }
+    ]
+  },
+  "similarity_detection": {
+    "exact_spans": 2,
+    "near_spans": 0,
+    "matched_words": 36,
+    "eligible_words": 210,
+    "similarity_index_pct": 17.14,
+    "formula": "SI = (Unique Matched Eligible Words / Total Eligible Words) × 100%"
+  },
+  "elapsed_ms": 23.64
+}

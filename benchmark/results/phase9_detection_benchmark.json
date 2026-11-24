@@ -1,0 +1,134 @@
+{
+  "benchmark": "phase9-academic-similarity-detection",
+  "mode": "offline_ground_truth_benchmark",
+  "scenarios_count": 12,
+  "confusion_matrix": {
+    "tp": 7,
+    "fp": 0,
+    "tn": 5,
+    "fn": 0
+  },
+  "metrics": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "retrieval_precision_at_5": 0.8,
+    "retrieval_recall_at_5": 1.0,
+    "fulltext_acquisition_success_rate": 0.9167,
+    "cross_source_zero_double_counting": true,
+    "processing_time_ms": 26.23
+  },
+  "scenarios": [
+    {
+      "scenario": "1_exact_copy",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 65.71,
+      "matched_words": 23,
+      "eligible_words": 35,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "2_near_exact",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 59.26,
+      "matched_words": 16,
+      "eligible_words": 27,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "3_indonesian_paraphrase",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 81.25,
+      "matched_words": 13,
+      "eligible_words": 16,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "4_reordered_paragraphs",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 93.75,
+      "matched_words": 45,
+      "eligible_words": 48,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "5_citation_overlap_excluded",
+      "expected_positive": false,
+      "detected_positive": false,
+      "similarity_index_pct": 0.0,
+      "matched_words": 0,
+      "eligible_words": 7,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "6_bibliography_overlap_excluded",
+      "expected_positive": false,
+      "detected_positive": false,
+      "similarity_index_pct": 0.0,
+      "matched_words": 0,
+      "eligible_words": 15,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "7_indonesian_academic_text",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 88.46,
+      "matched_words": 23,
+      "eligible_words": 26,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "8_english_academic_text",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 88.0,
+      "matched_words": 22,
+      "eligible_words": 25,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "9_cross_source_duplication",
+      "expected_positive": true,
+      "detected_positive": true,
+      "similarity_index_pct": 88.46,
+      "matched_words": 23,
+      "eligible_words": 26,
+      "fulltext_compared": 2
+    },
+    {
+      "scenario": "10_unrelated_technical_jargon",
+      "expected_positive": false,
+      "detected_positive": false,
+      "similarity_index_pct": 0.0,
+      "matched_words": 0,
+      "eligible_words": 16,
+      "fulltext_compared": 1
+    },
+    {
+      "scenario": "11_metadata_only_source",
+      "expected_positive": false,
+      "detected_positive": false,
+      "similarity_index_pct": 0.0,
+      "matched_words": 0,
+      "eligible_words": 26,
+      "fulltext_compared": 0
+    },
+    {
+      "scenario": "12_no_access_fulltext",
+      "expected_positive": false,
+      "detected_positive": false,
+      "similarity_index_pct": 0.0,
+      "matched_words": 0,
+      "eligible_words": 26,
+      "fulltext_compared": 0
+    }
+  ],
+  "disclaimer": "Benchmark ini mengukur akurasi mesin open-source NaskahGuard pada korpus ground-truth terkontrol dan tidak mengklaim kesetaraan database tertutup Turnitin."
+}

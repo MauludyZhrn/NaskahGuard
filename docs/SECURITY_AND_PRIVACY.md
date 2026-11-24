@@ -14,6 +14,10 @@
   - Backend **menolak startup** jika `HOST` bukan alamat loopback sementara `API_TOKEN` kosong.
   - CORS hanya mengizinkan origin lokal antarmuka frontend.
   - Rate limiting *sliding-window* berbasis IP diterapkan pada endpoint `POST` sensitif.
+- **Keamanan Crawler & Pencegahan SSRF (Phase 7)**:
+  - `app/sources/ssrf.py` membatasi skema hanya `http`/`https`, menolak `localhost`, host `.local`/`.internal`, alamat metadata cloud (`169.254.169.254`, `metadata.google.internal`), serta memvalidasi hasil resolusi DNS agar bukan IP privat, loopback, atau link-local.
+  - Setiap lompatan *HTTP redirect* divalidasi ulang terhadap SSRF (maksimal 5 redirect), mematuhi `robots.txt`, menerapkan jeda per domain (`CRAWL_DOMAIN_DELAY_SEC`), batas ukuran unduhan (`MAX_EXTERNAL_DOWNLOAD_MB`), dan *exponential backoff*.
+  - **Isolasi Playwright Chromium**: Browser crawler dijalankan pada konteks ephemeral terisolasi tanpa profil pengguna, tanpa cookies pribadi, tanpa password/sesi login, dan menyaring sub-request melalui route SSRF guard.
 - **Keamanan Internal Adapter Noplag**: `NOPLAG_ENGINE_URL` divalidasi agar hanya mengarah ke host loopback (`127.0.0.1`, `localhost`, `::1`).
 - **Retensi & Penghapusan Menyeluruh**: `DELETE /api/documents/{id}` menghapus berkas fisik, JSON ekstraksi, segmen, fingerprint, pemeriksaan, dan hasil match secara permanen. `RETENTION_DAYS > 0` memicu pembersihan otomatis dokumen submission kedaluwarsa saat startup dan berkala setiap 24 jam.
 - **Audit Logging**: Setiap unggahan, pemeriksaan, penghapusan, perubahan pengaturan, dan kegagalan otentikasi dicatat ke `audit_logs`.

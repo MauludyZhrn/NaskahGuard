@@ -1,0 +1,140 @@
+{
+  "viewports_tested": [
+    "1600x900",
+    "1440x900",
+    "1280x800",
+    "768x1024",
+    "390x844"
+  ],
+  "checks": [
+    {
+      "viewport": "1600x900",
+      "route": "/",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1600x900",
+      "route": "/new-check",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1600x900",
+      "route": "/reports/9f72c65d-6b4a-4f16-a471-f015c06781fa",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1440x900",
+      "route": "/",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1440x900",
+      "route": "/new-check",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1440x900",
+      "route": "/discovery-monitor",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1440x900",
+      "route": "/repositories",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1440x900",
+      "route": "/analytics",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1440x900",
+      "route": "/reports/9f72c65d-6b4a-4f16-a471-f015c06781fa",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1280x800",
+      "route": "/",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1280x800",
+      "route": "/new-check",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "1280x800",
+      "route": "/reports/9f72c65d-6b4a-4f16-a471-f015c06781fa",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "768x1024",
+      "route": "/",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "768x1024",
+      "route": "/new-check",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "768x1024",
+      "route": "/reports/9f72c65d-6b4a-4f16-a471-f015c06781fa",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "390x844",
+      "route": "/",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "390x844",
+      "route": "/new-check",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "390x844",
+      "route": "/discovery-monitor",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "390x844",
+      "route": "/repositories",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "390x844",
+      "route": "/analytics",
+      "horizontal_overflow": false
+    },
+    {
+      "viewport": "390x844",
+      "route": "/reports/9f72c65d-6b4a-4f16-a471-f015c06781fa",
+      "horizontal_overflow": false
+    }
+  ],
+  "duplicate_nav_violations": [],
+  "screenshots": [
+    "docs\\screenshots\\phase9\\01_dashboard_light.png",
+    "docs\\screenshots\\phase9\\02_new_check_light.png",
+    "docs\\screenshots\\phase9\\03_discovery_monitor_light.png",
+    "docs\\screenshots\\phase9\\04_report_overview_light.png",
+    "docs\\screenshots\\phase9\\05_report_compare_viewer.png",
+    "docs\\screenshots\\phase9\\06_report_overview_dark.png",
+    "docs\\screenshots\\phase9\\07_report_mobile_390.png"
+  ],
+  "console_errors": [],
+  "page_errors": [],
+  "formula_accordion_visible": true,
+  "expand_all_works": true,
+  "collapse_all_works": true,
+  "viewer_sticky_toolbar_visible": true,
+  "source_detail_dialog_visible": true,
+  "sidebar": {
+    "expanded_width": 260,
+    "collapsed_width": 72,
+    "reexpanded_width": 260,
+    "persisted_after_reload": true
+  },
+  "dark_mode_applied": true
+}

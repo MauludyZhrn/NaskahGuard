@@ -52,3 +52,37 @@ Metrik yang diukur secara nyata: **Precision**, **Recall**, **F1-Score**, **Fals
 | 10 | Simulasi hasil OCR buruk | 85.71% | 85.71% | 113.25 | 429.5 |
 | 11 | Tanpa sumber pembanding | 0.00% | 0.00% | 97.74 | 315.2 |
 | 12 | Dokumen multibahasa (ID + EN) | 43.24% | 43.24% | 212.11 | 507.0 |
+
+## 3. Evaluasi Phase 7 (`benchmark/run_phase7_eval.py`)
+Pengujian terpisah (`benchmark/results/phase7_eval.json`) mengukur tahap pencarian, akuisisi PDF/HTML terbuka, penolakan akses/metadata-only, dan pencocokan akhir:
+- **Search Retrieval**: `queries_executed=1`, `candidate_records=4`, `source_retrieval_precision=0.5000`, `search_and_acquisition_latency_ms=58.25 ms`.
+- **Crawling & Extraction**: `fulltext_indexed=2` (1 PDF + 1 HTML), `fulltext_acquisition_success_rate=1.0000`, `metadata_only_count=2`, `access_denied_count=0`.
+- **Similarity Matching**: `similarity_index=78.67%` (`exact=66.67%`, `near_exact=12.00%`), `sources_matched=2`, `total_matches=4`, `matching_processing_time_ms=65.02 ms`.
+
+
+---
+
+## Pembaruan Phase 8 — Pengujian Skor, Benchmark & Playwright UI QA
+
+1. **Unit & Integration Test Phase 8** (`backend/tests/test_phase8_scoring_and_search.py`):
+   - Memverifikasi perhitungan skor deterministik (termasuk skenario `57 / 6.227` kata eligible, pencegahan penghitungan ganda overlap Exact/Near-Exact, dan pengaruh pengecualian).
+   - Memverifikasi profil kueri `QUICK`/`BALANCED`/`DEEP` dan distribusi bab.
+   - Memverifikasi peringkat relevansi, TTL cache, dan endpoint telemetri `/api/providers`.
+2. **Search Benchmark Deterministik** (`benchmark/run_phase8_search_benchmark.py`):
+   - Menghasilkan `benchmark/results/phase8_search_benchmark.json` dengan pemisahan eksplisit antara mode offline deterministik dan status live provider.
+3. **Automated Playwright UI/UX QA** (`scripts/qa_ui_playwright.py`):
+   - Memverifikasi desktop (`1280×800`) dan tablet (`768×1024`), zero horizontal overflow, persistensi collapsible sidebar (`260px`/`72px`), accordion rumus skor, Dark Mode, serta zero console/page errors.
+
+
+---
+
+## Pembaruan Strategi Pengujian Phase 9
+
+1. **Mode Pengujian Jaringan Live Eksplisit (`LIVE_NETWORK_TESTS=true`)**:
+   - Pengujian unit/mock reguler tetap berjalan 100% deterministik secara offline (`31 passed`).
+   - Pengujian konektivitas internet nyata dipisahkan secara eksplisit melalui variabel lingkungan `LIVE_NETWORK_TESTS=true` pada `backend/tests/test_phase9_upgrade.py` serta skrip `benchmark/run_phase9_live_verification.py`.
+2. **Benchmark 3 Crawler (22 URL) & Benchmark Deteksi (12 Skenario)**:
+   - `benchmark/run_phase9_crawler_benchmark.py` membandingkan `IsolatedPlaywrightExtractor`, `Crawl4AI`, dan `Scrapling`.
+   - `benchmark/run_phase9_detection_benchmark.py` menguji 12 skenario ground-truth akademik.
+3. **Playwright UI QA 5 Viewport + Tangkapan Layar**:
+   - `scripts/qa_ui_playwright.py` memverifikasi `1600×900`, `1440×900`, `1280×800`, `768×1024`, dan `390×844` serta menyimpan tangkapan layar ke `docs/screenshots/phase9/`.

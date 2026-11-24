@@ -1,0 +1,66 @@
+{
+  "benchmark": "phase9-browser-crawler-comparison",
+  "dataset_size": 22,
+  "categories_tested": [
+    "dspace_repo",
+    "institutional_repo",
+    "js_rendered_html",
+    "ojs_page",
+    "open_access_journal",
+    "public_pdf",
+    "static_html",
+    "xml_jats"
+  ],
+  "selected_primary_architecture": "IsolatedPlaywrightExtractor (HTTP streaming + Density HTML/XML/PDF + Ephemeral Playwright Chromium fallback)",
+  "selection_rationale": "Arsitektur HTTP streaming + Isolated Playwright memberikan keberhasilan ekstraksi tertinggi pada seluruh 8 variasi format (termasuk biner PDF, JATS XML, halaman JS dinamis, OJS, DSpace, EPrints) dengan isolasi konteks penuh, validasi SSRF per hop/route, presisi penghapusan boilerplate tinggi, serta jejak dependensi produksi yang paling ringan dan stabil di Windows.",
+  "results": [
+    {
+      "engine": "playwright_naskahguard",
+      "available": true,
+      "urls_tested": 22,
+      "extraction_success_rate": 1.0,
+      "main_content_precision": 0.8274,
+      "boilerplate_removal_rate": 1.0,
+      "text_completeness_recall": 0.9621,
+      "canonical_url_accuracy": 1.0,
+      "metadata_accuracy": 0.8864,
+      "avg_latency_ms": 35.05,
+      "total_latency_ms": 2589.87,
+      "memory_delta_mb": 29.94,
+      "cpu_time_ms": 312.5,
+      "note": ""
+    },
+    {
+      "engine": "crawl4ai_local",
+      "available": true,
+      "urls_tested": 22,
+      "extraction_success_rate": 0.9091,
+      "main_content_precision": 0.4351,
+      "boilerplate_removal_rate": 0.1818,
+      "text_completeness_recall": 0.9091,
+      "canonical_url_accuracy": 0.1818,
+      "metadata_accuracy": 0.4545,
+      "avg_latency_ms": 2939.73,
+      "total_latency_ms": 65556.69,
+      "memory_delta_mb": 5.41,
+      "cpu_time_ms": 640.62,
+      "note": ""
+    },
+    {
+      "engine": "scrapling_standard_http",
+      "available": true,
+      "urls_tested": 22,
+      "extraction_success_rate": 0.9091,
+      "main_content_precision": 0.3902,
+      "boilerplate_removal_rate": 0.1818,
+      "text_completeness_recall": 0.7424,
+      "canonical_url_accuracy": 1.0,
+      "metadata_accuracy": 0.8636,
+      "avg_latency_ms": 11.66,
+      "total_latency_ms": 261.1,
+      "memory_delta_mb": 0.84,
+      "cpu_time_ms": 140.62,
+      "note": ""
+    }
+  ]
+}

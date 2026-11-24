@@ -27,6 +27,9 @@ NaskahGuard sendiri dilisensikan di bawah **Apache License 2.0** (lihat berkas `
 | `httpx` | BSD-3-Clause | Klien HTTP untuk adapter sumber resmi |
 | `jinja2` | BSD-3-Clause | Template laporan HTML mandiri |
 | `reportlab` | BSD-3-Clause | Pembuatan laporan PDF |
+| `beautifulsoup4` | MIT | Pembersihan boilerplate HTML & ekstraksi artikel web |
+| `defusedxml` | PSF-2.0 | Parsing aman XML JATS/TEI/OAI-PMH (anti-XXE) |
+| `playwright` | Apache-2.0 | Browser crawler terisolasi (Chromium) untuk halaman web JS |
 | `pytest` (dev) | MIT | Kerangka uji otomatis |
 | `pytesseract` (opsional) | Apache-2.0 | Pembungkus Tesseract OCR (biner Tesseract berlisensi Apache-2.0) |
 | `sentence-transformers` (opsional) | Apache-2.0 | Embedding semantik multibahasa |
@@ -41,3 +44,22 @@ NaskahGuard sendiri dilisensikan di bawah **Apache License 2.0** (lihat berkas `
 | `recharts` | MIT | Visualisasi grafik analitik |
 | `lucide-react` | ISC | Ikon vektor UI |
 | `vite`, `@vitejs/plugin-react`, `typescript` | MIT / Apache-2.0 | Bundler & compiler TypeScript |
+
+
+---
+
+## Tambahan Dependensi & Komponen Phase 9
+
+### Frontend (`frontend/package.json` & `src/components/ui/`)
+- `tailwindcss` (`^3.4.17`), `postcss`, `autoprefixer` — **MIT License**
+- `@radix-ui/react-*` (`accordion`, `alert-dialog`, `collapsible`, `dialog`, `dropdown-menu`, `progress`, `select`, `separator`, `slot`, `tabs`, `tooltip`) — **MIT License**
+- `class-variance-authority` — **Apache-2.0 License**
+- `clsx`, `tailwind-merge` — **MIT License**
+- `motion` (`^12.0.0`, untuk komponen Magic UI `NumberTicker` & `BlurFade`) — **MIT License**
+- Komponen kode sumber `shadcn/ui` & `Magic UI` (`number-ticker.tsx`, `blur-fade.tsx`) — **MIT License**
+
+### Agent Skills & Evaluasi Benchmark (Non-Produksi)
+- `shadcn` skill (`shadcn-ui/ui`) — **MIT License**
+- `magic-ui` skill (`magicuidesign/magicui`) — **MIT License**
+- `scrapling-official` skill & paket evaluasi `scrapling` (`D4Vinci/Scrapling`) — **BSD-3-Clause License**
+- Paket evaluasi benchmark terisolasi `crawl4ai` (`unclecode/crawl4ai`) — **Apache-2.0 License**
