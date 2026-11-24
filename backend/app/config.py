@@ -52,6 +52,18 @@ class Settings(BaseSettings):
     THRESHOLD_LOW: float = 15.0
     THRESHOLD_HIGH: float = 30.0
 
+    # Phase 7: External Search, Crawler & Acquisition settings
+    SEARXNG_URL: str = ""
+    WEB_SEARCH_API_URL: str = ""
+    WEB_SEARCH_API_KEY: str = ""
+    OPENALEX_API_KEY: str = ""
+    DEFAULT_MAX_SEARCH_QUERIES: int = 8
+    DEFAULT_MAX_CRAWL_URLS: int = 12
+    MAX_EXTERNAL_DOWNLOAD_MB: int = 25
+    CRAWL_TIMEOUT_SEC: int = 20
+    CRAWL_DOMAIN_DELAY_SEC: float = 1.5
+    PLAYWRIGHT_ENABLED: bool = True
+
     CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: [
             "http://127.0.0.1:5173",

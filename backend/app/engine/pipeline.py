@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import time
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -17,7 +18,7 @@ from app.engine.scoring import compute_scores
 from app.engine.semantic import find_semantic_candidates, get_semantic_status
 from app.engine.winnowing import retrieve_winnowing_candidates, winnow_tokens
 from app.ingestion.service import index_document_for_corpus, load_extracted_payload
-from app.models import AppSetting, Check, CheckSource, Document, Match, Segment
+from app.models import AppSetting, Check, CheckSource, Document, Match, Segment, SourceAcquisition
 from app.schemas import CheckSettingsSchema
 from app.sources.local_corpus import LocalCorpusProvider
 from app.sources.registry import discover_external_sources
@@ -62,6 +63,8 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
         return
 
     try:
+        t_pipe0 = time.perf_counter()
+        stage_timings_ms: dict[str, int] = {}
         check.status = "PROCESSING"
         check.started_at = datetime.now(timezone.utc)
         cfg = CheckSettingsSchema(**(check.settings or {}))
@@ -94,12 +97,13 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
         _update_progress(db, check, "Penemuan Sumber", 25, stage_counts)
 
         # Stage 6: Source Discovery
+        t_disc0 = time.perf_counter()
         local_provider = LocalCorpusProvider(
             db,
             include_submissions=cfg.compare_with_previous_submissions,
             exclude_doc_id=doc.id,
         )
-        local_doc_ids = local_provider.list_eligible_doc_ids()
+        local_doc_ids = local_provider.list_eligible_doc_ids() if cfg.include_local_corpus else set()
         all_source_ids = set(local_doc_ids)
 
         ext_queries = 0
@@ -107,13 +111,15 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
         ext_meta_records = []
         ext_denied = 0
         ext_failed = 0
-        if cfg.use_external_sources and cfg.external_providers:
+        ext_search_cov: dict[str, Any] = {}
+        if cfg.use_external_sources and (cfg.external_providers or cfg.enable_web_search):
             ext_summary = discover_external_sources(
                 db,
                 check_id=check.id,
                 submission_doc=doc,
                 submission_segments=sub_segments,
                 provider_names=cfg.external_providers,
+                check_settings=cfg,
             )
             all_source_ids.update(ext_summary.external_fulltext_doc_ids)
             ext_queries = ext_summary.queries_executed
@@ -121,6 +127,9 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
             ext_results = len(ext_summary.external_fulltext_doc_ids) + len(ext_meta_records)
             ext_denied = ext_summary.access_denied_count
             ext_failed = ext_summary.fetch_failed_count
+            ext_search_cov = ext_summary.search_coverage
+            stage_timings_ms.update(ext_summary.stage_timings_ms)
+        stage_timings_ms["source_discovery_ms"] = int((time.perf_counter() - t_disc0) * 1000)
 
         stage_counts["source_discovery"] = {
             "local_docs": len(local_doc_ids),
@@ -335,8 +344,72 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
                 ],
             )
 
-        # Store metadata-only records summary in coverage for transparency
+        # Store metadata-only records summary and Phase 7/8 Search Coverage Analytics
+        verified_src_ids = [s.source_document_id for s in scoring.source_summaries]
+        if verified_src_ids:
+            db.query(SourceAcquisition).filter(
+                SourceAcquisition.check_id == check.id,
+                SourceAcquisition.document_id.in_(verified_src_ids),
+            ).update({"status": "MATCH_VERIFIED"}, synchronize_session=False)
+
+        stage_timings_ms["total_pipeline_ms"] = int((time.perf_counter() - t_pipe0) * 1000)
+        if isinstance(scoring.metrics.get("score_explanation"), dict):
+            scoring.metrics["score_explanation"]["overlap_tokens_removed"] = duplicate_removed
+        scoring.metrics["stage_timings_ms"] = stage_timings_ms
+
         coverage = dict(scoring.coverage)
+        coverage["source_metrics"] = {
+            "search_results_count": ext_search_cov.get("total_provider_responses", ext_results),
+            "sources_discovered": ext_search_cov.get("total_provider_responses", ext_results),
+            "total_sources_discovered": ext_search_cov.get("total_provider_responses", ext_results),
+            "unique_urls_discovered": ext_search_cov.get("total_unique_urls_found", 0),
+            "total_urls_found": ext_search_cov.get("total_unique_urls_found", 0),
+            "fulltext_fetched": ext_search_cov.get("total_fulltext_fetched", 0),
+            "fulltext_downloaded": ext_search_cov.get("total_fulltext_fetched", 0),
+            "fulltext_indexed": ext_search_cov.get("total_fulltext_indexed", 0),
+            "fulltext_compared": len(all_source_ids),
+            "verified_matching_sources": len(scoring.source_summaries),
+            "verified_contributing_sources": len(scoring.source_summaries),
+            "matching_sources": len(scoring.source_summaries),
+            "metadata_only": ext_search_cov.get("total_metadata_only", len(ext_meta_records)),
+            "metadata_only_sources": ext_search_cov.get("total_metadata_only", len(ext_meta_records)),
+            "inaccessible": ext_search_cov.get("total_inaccessible_sources", ext_denied),
+            "inaccessible_sources": ext_search_cov.get("total_inaccessible_sources", ext_denied),
+            "failed_crawling": ext_search_cov.get("total_failed_crawling", ext_failed),
+            "failed_acquisitions": ext_search_cov.get("total_failed_crawling", ext_failed),
+        }
+        coverage["search_coverage"] = {
+            "total_search_queries": ext_search_cov.get("total_search_queries", ext_queries),
+            "total_provider_responses": ext_search_cov.get("total_provider_responses", ext_results),
+            "total_unique_urls_found": ext_search_cov.get("total_unique_urls_found", 0),
+            "total_pages_crawled": ext_search_cov.get("total_pages_crawled", 0),
+            "total_fulltext_fetched": ext_search_cov.get("total_fulltext_fetched", 0),
+            "total_fulltext_indexed": ext_search_cov.get("total_fulltext_indexed", 0),
+            "total_metadata_only": ext_search_cov.get("total_metadata_only", len(ext_meta_records)),
+            "total_inaccessible_sources": ext_search_cov.get("total_inaccessible_sources", ext_denied),
+            "total_failed_crawling": ext_search_cov.get("total_failed_crawling", ext_failed),
+            "total_verified_matching_sources": len(scoring.source_summaries),
+            "providers_failed": ext_search_cov.get("providers_failed", []),
+            "relevance_breakdown": ext_search_cov.get("relevance_breakdown", {}),
+            "generated_queries": ext_search_cov.get("generated_queries", []),
+            "indicators": {
+                "local_corpus_coverage": f"{len(local_doc_ids)} dokumen lokal terindeks",
+                "academic_database_coverage": "Aktif" if (cfg.use_external_sources and cfg.enable_academic_search) else "Nonaktif",
+                "public_web_coverage": "Aktif" if (cfg.use_external_sources and cfg.enable_web_search) else "Nonaktif",
+                "oai_pmh_coverage": "Aktif (via Korpus Lokal)" if cfg.enable_oai_sources else "Nonaktif",
+                "fulltext_availability": f"{len(all_source_ids)} dokumen full-text dibandingkan",
+                "external_search_coverage": (
+                    f"{ext_search_cov.get('total_fulltext_indexed', 0)} full-text diindeks dari "
+                    f"{ext_search_cov.get('total_unique_urls_found', 0)} URL ditemukan"
+                    if cfg.use_external_sources
+                    else "Pencarian eksternal dimatikan"
+                ),
+            },
+            "coverage_disclaimer": (
+                "Cakupan menunjukkan jumlah sumber yang berhasil diakses dan diverifikasi dalam pemeriksaan ini, "
+                "bukan persentase keseluruhan dokumen yang ada di internet."
+            ),
+        }
         coverage["metadata_only_items"] = [
             {
                 "provider": r.provider,

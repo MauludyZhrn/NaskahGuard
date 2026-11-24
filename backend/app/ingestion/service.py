@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.engine.minhash_lsh import compute_minhash_bytes, invalidate_lsh_cache
 from app.engine.winnowing import winnow_tokens
 from app.ingestion.docx_extractor import extract_docx
+from app.ingestion.html_extractor import extract_html
 from app.ingestion.language import detect_language
 from app.ingestion.pdf import ExtractedDocument, extract_pdf
 from app.ingestion.segment import SegmentSpan, segment_document
@@ -23,6 +24,7 @@ from app.ingestion.structure import annotate_structure
 from app.ingestion.tokenize import TokenSpan, tokenize_with_offsets
 from app.ingestion.txt import extract_txt
 from app.ingestion.validators import ValidatedUpload, resolve_safe_storage_path
+from app.ingestion.xml_extractor import extract_xml
 from app.models import Document, Fingerprint, Segment
 
 
@@ -41,6 +43,10 @@ def _run_extractor(file_type: str, file_path: Path) -> ExtractedDocument:
         return extract_docx(file_path)
     if file_type == "txt":
         return extract_txt(file_path)
+    if file_type == "html":
+        return extract_html(file_path)
+    if file_type == "xml":
+        return extract_xml(file_path)
     raise ValueError(f"Tipe file tidak dikenali: {file_type}")
 
 
@@ -76,6 +82,13 @@ def index_document_for_corpus(
     return len(fps)
 
 
+def normalize_title_key(title: str | None) -> str | None:
+    if not title:
+        return None
+    cleaned = " ".join("".join(ch.lower() if ch.isalnum() else " " for ch in title).split())
+    return cleaned[:500] if cleaned else None
+
+
 def ingest_validated_upload(
     db: Session,
     upload: ValidatedUpload,
@@ -86,6 +99,10 @@ def ingest_validated_upload(
     year: int | None = None,
     doi: str | None = None,
     url: str | None = None,
+    canonical_url: str | None = None,
+    license_name: str | None = None,
+    indexing_status: str = "FULLTEXT_INDEXED",
+    alternate_urls: list[str] | None = None,
     source_type: str = "local_document",
     access_status: str = "INDEXED_LOCALLY",
     provider: str | None = None,
@@ -144,6 +161,10 @@ def ingest_validated_upload(
     json_path = get_extracted_json_path(doc_id)
     json_path.write_text(json.dumps(extracted_payload, ensure_ascii=False), encoding="utf-8")
 
+    resolved_title = (title.strip() if title else None) or extracted.title or upload.clean_filename
+    resolved_doi = (doi.strip() if doi else None) or extracted.extra.get("doi")
+    resolved_canon = (canonical_url.strip() if canonical_url else None) or extracted.extra.get("canonical_url") or url
+
     doc = Document(
         id=doc_id,
         role=role,
@@ -156,11 +177,16 @@ def ingest_validated_upload(
         language=language,
         page_count=max(1, len(extracted.pages)),
         word_count=len(tokens),
-        title=(title.strip() if title else None) or extracted.title or upload.clean_filename,
+        title=resolved_title[:512] if resolved_title else None,
+        normalized_title=normalize_title_key(resolved_title),
         authors=authors if authors is not None else extracted.authors,
         year=year,
-        doi=doi.strip() if doi else None,
+        doi=resolved_doi[:255] if resolved_doi else None,
         url=url.strip() if url else None,
+        canonical_url=resolved_canon[:1024] if resolved_canon else None,
+        license=license_name[:255] if license_name else None,
+        indexing_status=indexing_status,
+        alternate_urls=alternate_urls or ([url.strip()] if url else []),
         source_type=source_type,
         access_status=access_status,
         extraction_method=extracted.extraction_method,

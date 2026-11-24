@@ -10,7 +10,7 @@ from alembic.config import Config as AlembicConfig
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import audit, checks, config, corpus, dashboard, documents, health, providers, reports, settings as settings_api
+from app.api import audit, checks, config, corpus, dashboard, documents, health, oai, providers, reports, settings as settings_api
 from app.config import BASE_DIR, get_settings
 from app.db import Base, dispose_engine, init_db
 from app.security import validate_startup_security
@@ -69,6 +69,7 @@ def create_app() -> FastAPI:
         reports.router,
         dashboard.router,
         providers.router,
+        oai.router,
         settings_api.router,
         audit.router,
     ):

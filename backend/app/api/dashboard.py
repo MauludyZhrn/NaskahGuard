@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import AuditLog, Check, Document, Fingerprint
+from app.models import AuditLog, Check, Document, Fingerprint, ProviderQuery, SourceAcquisition
 from app.security import require_auth
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"], dependencies=[Depends(require_auth)])
@@ -66,14 +66,31 @@ def get_dashboard(db: Session = Depends(get_db)) -> dict:
         for a in audits
     ]
 
+    total_queries = db.query(func.count(ProviderQuery.id)).scalar() or 0
+    total_acquisitions = db.query(func.count(SourceAcquisition.id)).scalar() or 0
+    trend = [
+        {
+            "report_number": chk.report_number,
+            "similarity_index": float(chk.metrics.get("similarity_index", 0.0)),
+            "date": chk.finished_at.strftime("%d/%m") if chk.finished_at else "-",
+        }
+        for chk, _ in reversed(completed_checks[:12])
+    ]
+
     return {
         "total_documents_checked": total_checked,
         "total_submissions": submission_count,
         "average_similarity": avg_si,
         "recent_reports": recent_reports,
         "recent_activity": recent_activity,
+        "trend": trend,
+        "provider_stats": {
+            "total_queries": total_queries,
+            "total_acquisitions": total_acquisitions,
+        },
         "corpus_stats": {
             "total_documents": len(corpus_docs),
+            "fulltext_sources_available": sum(1 for d in corpus_docs if d.indexing_status in {"FULLTEXT_INDEXED", "MATCH_VERIFIED", "INDEXED"}),
             "total_words": total_corpus_words,
             "total_fingerprints": fp_count,
         },

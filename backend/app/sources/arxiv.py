@@ -85,9 +85,12 @@ class ArxivProvider(SourceProvider):
                         authors=[a for a in authors if a][:10],
                         year=year,
                         url=entry_id or f"https://arxiv.org/abs/{arxiv_id}",
+                        canonical_url=f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else entry_id,
                         source_type="arxiv_preprint",
                         access_status="FULL_TEXT_AVAILABLE" if pdf_url else "METADATA_ONLY",
                         oa_pdf_url=pdf_url,
+                        candidate_urls=[pdf_url] if pdf_url else [],
+                        abstract=" ".join((entry.findtext("atom:summary", default="", namespaces=_ATOM_NS) or "").split())[:1000] or None,
                         retrieved_at=datetime.now(timezone.utc),
                     )
                 )

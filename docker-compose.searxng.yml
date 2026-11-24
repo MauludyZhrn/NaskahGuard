@@ -1,0 +1,17 @@
+# Opsional: Instance SearXNG Self-Hosted untuk NaskahGuard General Web Search
+# Tidak wajib untuk menjalankan NaskahGuard (NaskahGuard berjalan lokal tanpa Docker).
+# Jalankan hanya jika Docker tersedia dan Anda ingin mengaktifkan pencarian web umum tanpa API key:
+#   docker compose -f docker-compose.searxng.yml up -d
+# Lalu atur pada backend/.env:
+#   SEARXNG_BASE_URL=http://127.0.0.1:8080
+
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: naskahguard-searxng
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8080/
+      - SEARXNG_SECRET=ganti-secret-acak-lokal-anda
+    restart: unless-stopped

@@ -50,20 +50,26 @@ class CrossrefProvider(SourceProvider):
                 ]
                 year = None
                 issued = item.get("issued", {}).get("date-parts")
-                if issued and issued[0]:
+                if issued and issued[0] and issued[0][0] is not None:
                     year = int(issued[0][0])
                 doi = item.get("DOI")
+                landing = item.get("URL") or (f"https://doi.org/{doi}" if doi else None)
+                licenses = item.get("license") or []
+                lic_url = licenses[0].get("URL") if licenses and isinstance(licenses[0], dict) else None
                 records.append(
                     SourceRecord(
                         provider=self.name,
-                        external_id=doi or item.get("URL") or title[:80],
+                        external_id=doi or landing or title[:80],
                         title=title,
                         authors=authors[:10],
                         year=year,
                         doi=doi,
-                        url=item.get("URL") or (f"https://doi.org/{doi}" if doi else None),
+                        url=landing,
+                        canonical_url=landing,
                         source_type="crossref_metadata",
                         access_status="METADATA_ONLY",
+                        license=lic_url,
+                        extra={"publisher": item.get("publisher")},
                         retrieved_at=datetime.now(timezone.utc),
                     )
                 )

@@ -18,7 +18,18 @@ class CheckSettingsSchema(BaseModel):
     min_match_words: int = Field(default=8, ge=3, le=50)
     include_lexical_in_index: bool = False
     use_external_sources: bool = False
-    external_providers: list[str] = Field(default_factory=lambda: ["openalex", "crossref", "arxiv"])
+    include_local_corpus: bool = True
+    enable_academic_search: bool = True
+    enable_web_search: bool = False
+    enable_fulltext_download: bool = True
+    enable_browser_crawler: bool = False
+    enable_oai_sources: bool = True
+    search_intensity: str = Field(default="QUICK", pattern="^(QUICK|BALANCED|DEEP)$")
+    max_search_queries: int = Field(default=8, ge=1, le=48)
+    max_crawled_urls: int = Field(default=12, ge=1, le=50)
+    max_download_mb: int = Field(default=25, ge=1, le=100)
+    search_language: str = Field(default="all", pattern="^(all|id|en)$")
+    external_providers: list[str] = Field(default_factory=lambda: ["openalex", "europe_pmc", "arxiv", "crossref"])
     compare_with_previous_submissions: bool = False
     add_to_corpus_after_check: bool = False
     use_noplag_engine: bool = False

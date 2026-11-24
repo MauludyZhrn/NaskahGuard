@@ -55,6 +55,11 @@ class Document(Base):
     year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     doi: Mapped[str | None] = mapped_column(String(255), nullable=True)
     url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    canonical_url: Mapped[str | None] = mapped_column(String(1024), nullable=True, index=True)
+    normalized_title: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+    license: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    indexing_status: Mapped[str] = mapped_column(String(32), nullable=False, default="FULLTEXT_INDEXED")
+    alternate_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)
     source_type: Mapped[str] = mapped_column(String(64), nullable=False, default="local_document")
     access_status: Mapped[str] = mapped_column(String(32), nullable=False, default="INDEXED_LOCALLY")
     extraction_method: Mapped[str] = mapped_column(String(24), nullable=False, default="TEXT")
@@ -216,3 +221,46 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class SourceAcquisition(Base):
+    __tablename__ = "source_acquisitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    check_id: Mapped[str] = mapped_column(String(36), ForeignKey("checks.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    query: Mapped[str] = mapped_column(String(512), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    authors: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    doi: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    canonical_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False, default="external_paper")
+    file_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    license: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="SEARCH_RESULT_ONLY", index=True)
+    used_playwright: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    document_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class OAIRepository(Base):
+    __tablename__ = "oai_repositories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
+    repo_type: Mapped[str] = mapped_column(String(32), nullable=False, default="ojs")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    identified_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    metadata_prefix: Mapped[str] = mapped_column(String(64), nullable=False, default="oai_dc")
+    last_harvested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_datestamp: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    records_harvested: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    fulltext_indexed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="UNVERIFIED")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)

@@ -11,15 +11,15 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.engine.exclusions import build_exclusion_mask
 from app.ingestion.service import load_extracted_payload
-from app.models import Check, CheckSource, Document, Match, ProviderQuery, Segment
+from app.models import Check, CheckSource, Document, Match, ProviderQuery, Segment, SourceAcquisition
 from app.schemas import CheckSettingsSchema
 
 LAYER_PRIORITY = {
-    "EXACT": 0,
-    "NEAR_EXACT": 1,
-    "LEXICAL": 2,
-    "SEMANTIC": 3,
-    "EXCLUDED": 4,
+    "EXCLUDED": 0,
+    "EXACT": 1,
+    "NEAR_EXACT": 2,
+    "LEXICAL": 3,
+    "SEMANTIC": 4,
 }
 
 
@@ -56,6 +56,12 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
         .order_by(ProviderQuery.started_at.asc())
         .all()
     )
+    acquisitions = (
+        db.query(SourceAcquisition)
+        .filter(SourceAcquisition.check_id == check.id)
+        .order_by(SourceAcquisition.id.asc())
+        .all()
+    )
 
     doc_map = {d.id: d for _, d in sources_rows}
     missing_src_ids = {m.source_document_id for m in matches if m.source_document_id not in doc_map}
@@ -75,6 +81,10 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
                 "year": sdoc.year,
                 "doi": sdoc.doi,
                 "url": sdoc.url,
+                "canonical_url": sdoc.canonical_url or sdoc.url,
+                "alternate_urls": sdoc.alternate_urls or [],
+                "license": sdoc.license,
+                "indexing_status": sdoc.indexing_status,
                 "source_type": sdoc.source_type,
                 "access_status": sdoc.access_status,
                 "provider": sdoc.provider or "local_corpus",
@@ -202,6 +212,28 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
                 "duration_ms": pq.duration_ms,
             }
             for pq in provider_queries
+        ],
+        "acquisitions": [
+            {
+                "id": acq.id,
+                "provider": acq.provider,
+                "query": acq.query,
+                "title": acq.title,
+                "authors": acq.authors or [],
+                "year": acq.year,
+                "doi": acq.doi,
+                "source_url": acq.source_url,
+                "canonical_url": acq.canonical_url,
+                "source_type": acq.source_type,
+                "file_type": acq.file_type,
+                "license": acq.license,
+                "status": acq.status,
+                "used_playwright": acq.used_playwright,
+                "document_id": acq.document_id,
+                "error": acq.error,
+                "duration_ms": acq.duration_ms,
+            }
+            for acq in acquisitions
         ],
     }
 

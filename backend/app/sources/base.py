@@ -1,4 +1,4 @@
-"""Base interfaces, dataclasses, and privacy-preserving keyword extraction for Source Discovery."""
+"""Base interfaces, dataclasses, and compatibility helpers for Source Discovery."""
 
 from __future__ import annotations
 
@@ -18,10 +18,15 @@ class SourceRecord:
     authors: list[str] = field(default_factory=list)
     year: int | None = None
     doi: str | None = None
+    pmid: str | None = None
     url: str | None = None
+    canonical_url: str | None = None
     source_type: str = "external_paper"
     access_status: str = "METADATA_ONLY"  # FULL_TEXT_AVAILABLE | METADATA_ONLY | ACCESS_DENIED | FETCH_FAILED | INDEXED_LOCALLY
     oa_pdf_url: str | None = None
+    candidate_urls: list[str] = field(default_factory=list)
+    license: str | None = None
+    abstract: str | None = None
     retrieved_at: datetime | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -31,6 +36,7 @@ class FetchedContent:
     filename: str
     raw_bytes: bytes
     content_type: str = "application/pdf"
+    file_type: str = "pdf"
 
 
 @dataclass
@@ -58,7 +64,7 @@ class SourceProvider(ABC):
 
 
 def extract_query_keywords(title: str | None, segments_text: list[str], max_keywords: int = 10) -> list[str]:
-    """Build safe short search queries from title + top TF-IDF phrases (never sends full text)."""
+    """Compatibility helper building safe short search queries from title + top TF-IDF phrases."""
     queries: list[str] = []
     clean_title = (title or "").strip()
     if clean_title and not clean_title.lower().endswith((".pdf", ".docx", ".txt")):

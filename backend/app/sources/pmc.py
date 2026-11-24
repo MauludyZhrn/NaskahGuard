@@ -84,7 +84,6 @@ class PubMedCentralProvider(SourceProvider):
                 client.close()
 
     def fetch_content(self, source_id: str) -> FetchedContent | None:
-        # PMC full-text OA archive requires bulk FTP/OA service XML retrieval; marked metadata-only here.
         return None
 
     def get_metadata(self, source_id: str) -> SourceRecord | None:

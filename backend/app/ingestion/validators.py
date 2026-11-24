@@ -13,12 +13,15 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+ACQUIRED_EXTENSIONS = {".pdf", ".docx", ".txt", ".html", ".xml"}
 _SAFE_FILENAME_RE = re.compile(r"[^\w\-. ]", re.UNICODE)
 
 MIME_BY_EXT = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".txt": "text/plain",
+    ".html": "text/html",
+    ".xml": "application/xml",
 }
 
 
@@ -142,14 +145,24 @@ async def read_and_validate_upload(file: UploadFile, max_bytes: int) -> Validate
     )
 
 
-def validate_local_bytes(filename: str, raw: bytes, max_bytes: int) -> ValidatedUpload:
+def validate_local_bytes(
+    filename: str,
+    raw: bytes,
+    max_bytes: int,
+    *,
+    allow_web_formats: bool = False,
+) -> ValidatedUpload:
     clean_name = sanitize_filename(filename)
     ext = os.path.splitext(clean_name)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
+    allowed = ACQUIRED_EXTENSIONS if allow_web_formats else ALLOWED_EXTENSIONS
+    if ext not in allowed:
         raise ValueError(f"Ekstensi tidak didukung: {ext}")
     if len(raw) > max_bytes:
         raise ValueError("Ukuran berkas melebihi batas maksimum.")
-    validate_magic_bytes(ext, raw)
+    if ext in ALLOWED_EXTENSIONS:
+        validate_magic_bytes(ext, raw)
+    elif len(raw) == 0:
+        raise ValueError("Konten kosong.")
     file_hash = hashlib.sha256(raw).hexdigest()
     return ValidatedUpload(
         clean_filename=clean_name,

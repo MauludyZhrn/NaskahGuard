@@ -150,10 +150,31 @@ def compute_scores(
     )
 
     matched_eligible_words = len(claimed_tokens)
-    adjusted_si = round((matched_eligible_words / eligible_words) * 100.0, 2) if eligible_words > 0 else 0.0
+    unrounded_raw_si = (len(raw_matched_tokens) / total_words) * 100.0 if total_words > 0 else 0.0
+    unrounded_adj_si = (matched_eligible_words / eligible_words) * 100.0 if eligible_words > 0 else 0.0
+    unrounded_exact_pct = (layer_counts.get("EXACT", 0) / eligible_words) * 100.0 if eligible_words > 0 else 0.0
+    unrounded_near_pct = (layer_counts.get("NEAR_EXACT", 0) / eligible_words) * 100.0 if eligible_words > 0 else 0.0
 
-    exact_pct = round((layer_counts.get("EXACT", 0) / eligible_words) * 100.0, 2) if eligible_words > 0 else 0.0
-    near_exact_pct = round((layer_counts.get("NEAR_EXACT", 0) / eligible_words) * 100.0, 2) if eligible_words > 0 else 0.0
+    adjusted_si = round(unrounded_adj_si, 2)
+    exact_pct = round(unrounded_exact_pct, 2)
+    near_exact_pct = round(unrounded_near_pct, 2)
+
+    # Detect display rounding residue (e.g. 408/5973 -> 6.8307% = 6.83%, while 290/5973=4.86% + 118/5973=1.98% = 6.84%)
+    rounded_layer_sum = round(exact_pct + near_exact_pct + (round((layer_counts.get("LEXICAL", 0) / eligible_words) * 100.0, 2) if (settings.include_lexical_in_index and eligible_words > 0) else 0.0), 2)
+    rounding_gap = round(rounded_layer_sum - adjusted_si, 2)
+    if abs(rounding_gap) > 0:
+        rounding_note = (
+            f"Nilai presisi sebelum pembulatan: Exact {unrounded_exact_pct:.4f}% ({layer_counts.get('EXACT', 0)} kata) "
+            f"+ Near-Exact {unrounded_near_pct:.4f}% ({layer_counts.get('NEAR_EXACT', 0)} kata) "
+            f"= {unrounded_adj_si:.4f}% ({matched_eligible_words}/{eligible_words} kata unik, tanpa double-counting). "
+            f"Selisih {rounding_gap:+.2f}% antara jumlah angka terbulat ({rounded_layer_sum:.2f}%) dan Adjusted SI ({adjusted_si:.2f}%) "
+            f"murni berasal dari pembulatan dua desimal masing-masing komponen."
+        )
+    else:
+        rounding_note = (
+            f"Nilai presisi sebelum pembulatan: {unrounded_adj_si:.4f}% ({matched_eligible_words}/{eligible_words} kata unik, "
+            f"tanpa penghitungan ganda antar lapisan maupun sumber)."
+        )
 
     # Lexical tokens outside claimed SI
     lexical_tokens: set[int] = set()
@@ -184,6 +205,22 @@ def compute_scores(
         external_enabled=settings.use_external_sources,
     )
 
+    raw_diff = round(raw_si - adjusted_si, 2)
+    if abs(raw_diff) < 0.01:
+        diff_reason = (
+            "Raw Similarity dan Adjusted Similarity bernilai sama karena tidak ada kata cocok "
+            "yang berada di zona pengecualian atau tidak ada kata yang dikecualikan."
+        )
+    else:
+        excl_parts = [f"{k}: {v} kata" for k, v in sorted(exclusion_breakdown.items())]
+        excl_summary = ", ".join(excl_parts) if excl_parts else f"{excluded_words_count} kata dikecualikan"
+        diff_reason = (
+            f"Raw Similarity menghitung seluruh {len(raw_matched_tokens)} kata cocok dari {total_words} total kata "
+            f"({raw_si:.2f}%), sedangkan Adjusted Similarity menghitung {matched_eligible_words} kata cocok unik "
+            f"dari {eligible_words} kata eligible setelah mengeluarkan {excluded_words_count} kata ({excl_summary}) "
+            f"sehingga menghasilkan {adjusted_si:.2f}% (selisih {raw_diff:+.2f} poin persentase)."
+        )
+
     metrics = {
         "similarity_index": adjusted_si,
         "raw_similarity": raw_si,
@@ -191,6 +228,8 @@ def compute_scores(
         "exact_match_pct": exact_pct,
         "near_exact_match_pct": near_exact_pct,
         "lexical_match_pct": lexical_pct,
+        "exact_match_words": layer_counts.get("EXACT", 0),
+        "near_exact_match_words": layer_counts.get("NEAR_EXACT", 0),
         "include_lexical_in_index": settings.include_lexical_in_index,
         "total_words": total_words,
         "eligible_words": eligible_words,
@@ -205,6 +244,35 @@ def compute_scores(
         "semantic_candidate_words": len(semantic_token_set),
         "semantic_status": semantic_status_msg,
         "operational_category": op_category,
+        "score_explanation": {
+            "formula": "SI = (Unique Matched Eligible Words / Total Eligible Words) × 100%",
+            "adjusted_formula": f"{matched_eligible_words} / {eligible_words} × 100% = {adjusted_si:.2f}% (presisi: {unrounded_adj_si:.4f}%)",
+            "raw_formula": f"{len(raw_matched_tokens)} / {total_words} × 100% = {raw_si:.2f}% (presisi: {unrounded_raw_si:.4f}%)",
+            "raw_similarity": raw_si,
+            "adjusted_similarity": adjusted_si,
+            "unrounded_raw_similarity": round(unrounded_raw_si, 6),
+            "unrounded_adjusted_similarity": round(unrounded_adj_si, 6),
+            "unrounded_exact_pct": round(unrounded_exact_pct, 6),
+            "unrounded_near_exact_pct": round(unrounded_near_pct, 6),
+            "rounding_note": rounding_note,
+            "total_words": total_words,
+            "eligible_words": eligible_words,
+            "unique_matched_words": matched_eligible_words,
+            "matched_eligible_words": matched_eligible_words,
+            "raw_matched_words": len(raw_matched_tokens),
+            "exact_match_words": layer_counts.get("EXACT", 0),
+            "exact_words": layer_counts.get("EXACT", 0),
+            "exact_match_pct": exact_pct,
+            "near_exact_match_words": layer_counts.get("NEAR_EXACT", 0),
+            "near_exact_words": layer_counts.get("NEAR_EXACT", 0),
+            "near_exact_match_pct": near_exact_pct,
+            "lexical_words": layer_counts.get("LEXICAL", 0),
+            "excluded_words": excluded_words_count,
+            "exclusion_breakdown": exclusion_breakdown,
+            "raw_vs_adjusted_difference": raw_diff,
+            "raw_vs_adjusted_reason": diff_reason,
+            "raw_vs_adjusted_diff_reason": diff_reason,
+        },
     }
 
     return ScoringResult(

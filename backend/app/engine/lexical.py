@@ -1,4 +1,4 @@
-"""Layer 3: Lexical similarity via BM25 document selection and TF-IDF char_wb (3,5) cosine."""
+"""Layer 3: Lexical & Indonesian morphological/paraphrase similarity via BM25 + TF-IDF char_wb + root fusion."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sqlalchemy.orm import Session
 
 from app.engine.exact import RawMatch
+from app.engine.indonesian_nlp import compute_indonesian_paraphrase_similarity, stem_indonesian_token
 from app.models import Segment
 
 LEXICAL_THRESHOLD = 0.70
@@ -19,9 +20,9 @@ def find_bm25_candidates(
     allowed_doc_ids: set[str],
     *,
     exclude_doc_ids: set[str] | None = None,
-    top_k: int = 5,
+    top_k: int = 6,
 ) -> list[str]:
-    """Select top-k corpus documents via BM25 over body segment tokens."""
+    """Select top-k corpus documents via stem-enriched BM25 over body segment tokens."""
     pool_ids = allowed_doc_ids - (exclude_doc_ids or set())
     if not pool_ids or not sub_norm_tokens:
         return []
@@ -33,7 +34,7 @@ def find_bm25_candidates(
     )
     doc_tokens: dict[str, list[str]] = {}
     for doc_id, norm_txt in rows:
-        toks = norm_txt.split()
+        toks = [stem_indonesian_token(t) for t in norm_txt.split() if t]
         if toks:
             doc_tokens.setdefault(doc_id, []).extend(toks)
 
@@ -43,7 +44,8 @@ def find_bm25_candidates(
     ids = list(doc_tokens.keys())
     corpus = [doc_tokens[d] for d in ids]
     bm25 = BM25Okapi(corpus)
-    scores = bm25.get_scores(sub_norm_tokens[:500])
+    query_stems = [stem_indonesian_token(t) for t in sub_norm_tokens[:600]]
+    scores = bm25.get_scores(query_stems)
     ranked = sorted(
         ((ids[idx], float(sc)) for idx, sc in enumerate(scores) if sc > 0),
         key=lambda x: (-x[1], x[0]),
@@ -59,7 +61,7 @@ def find_lexical_matches(
     threshold: float = LEXICAL_THRESHOLD,
     min_words: int = MIN_SENTENCE_WORDS,
 ) -> list[RawMatch]:
-    """Compare uncovered submission sentences against candidate sentences using TF-IDF char_wb (3,5)."""
+    """Compare uncovered submission sentences against candidate sentences using TF-IDF char_wb + Indonesian root/synonym fusion."""
     eligible_sub = []
     for seg in sub_segments:
         t_len = seg.token_end - seg.token_start
@@ -97,7 +99,6 @@ def find_lexical_matches(
     n_sub = len(sub_texts)
     sub_mat = all_mat[:n_sub]
     cand_mat = all_mat[n_sub:]
-    # Sparse cosine similarity (TF-IDF rows are already L2-normalized by sklearn)
     sim_matrix = (sub_mat @ cand_mat.T).toarray()
 
     matches: list[RawMatch] = []
@@ -105,13 +106,27 @@ def find_lexical_matches(
         best_j = -1
         best_score = threshold
         row = sim_matrix[i]
-        for j, score in enumerate(row):
-            if score >= best_score:
-                best_score = float(score)
+
+        # Inspect top candidate indices (either direct char_wb >= threshold or promising >= 0.42 for Indonesian paraphrase check)
+        for j, raw_cos in enumerate(row):
+            cos_val = float(raw_cos)
+            if cos_val < 0.42:
+                continue
+            fused_score, _expl = compute_indonesian_paraphrase_similarity(
+                sub_seg.original_text,
+                eligible_cand[j].original_text,
+                cos_val,
+            )
+            eff_score = max(cos_val if cos_val >= threshold else 0.0, fused_score)
+            # If raw char_wb was high ONLY because of shared technical words, respect anti-FP cap when < 0.82
+            if cos_val < 0.82 and fused_score < 0.63:
+                eff_score = fused_score
+            if eff_score >= best_score:
+                best_score = eff_score
                 best_j = j
+
         if best_j >= 0:
             c_seg = eligible_cand[best_j]
-            # Avoid emitting identical sentence if already covered
             t_indices = set(range(sub_seg.token_start, sub_seg.token_end))
             matches.append(
                 RawMatch(
