@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface ProcessFlowchartProps {
   stageCounts: Record<string, Record<string, unknown>>;
@@ -8,85 +9,85 @@ interface ProcessFlowchartProps {
 const STAGES: Array<{ key: string; title: string; format: (d?: Record<string, unknown>) => string }> = [
   {
     key: "upload",
-    title: "1. Upload Document",
+    title: "1. Unggah Naskah",
     format: (d) => (d ? `${String(d.filename || "-")} (${Math.round(Number(d.size_bytes || 0) / 1024)} KB)` : "-"),
   },
   {
     key: "validation",
-    title: "2. File Validation",
-    format: (d) => (d ? `Tipe ${String(d.file_type || "-").toUpperCase()} · Hash ${String(d.file_hash || "-")}` : "-"),
+    title: "2. Validasi Berkas",
+    format: (d) => (d ? `Format ${String(d.file_type || "-").toUpperCase()} · Hash terverifikasi` : "-"),
   },
   {
     key: "extraction",
-    title: "3. Text Extraction",
-    format: (d) => (d ? `${d.pages ?? 0} hlm · ${Number(d.chars || 0).toLocaleString("id-ID")} karakter · ${d.ocr_pages ?? 0} hlm OCR` : "-"),
+    title: "3. Ekstraksi Teks",
+    format: (d) => (d ? `${d.pages ?? 0} halaman · ${Number(d.chars || 0).toLocaleString("id-ID")} karakter` : "-"),
   },
   {
     key: "normalization",
-    title: "4. Text Normalization",
-    format: (d) => (d ? `${Number(d.tokens || 0).toLocaleString("id-ID")} token` : "-"),
+    title: "4. Normalisasi Kata",
+    format: (d) => (d ? `${Number(d.tokens || 0).toLocaleString("id-ID")} kata dinormalisasi` : "-"),
   },
   {
     key: "segmentation",
-    title: "5. Document Segmentation",
+    title: "5. Pembagian Struktur",
     format: (d) => (d ? `${d.paragraphs ?? 0} paragraf · ${d.sentences ?? 0} kalimat` : "-"),
   },
   {
     key: "source_discovery",
-    title: "6. Source Discovery",
-    format: (d) => (d ? `Lokal: ${d.local_docs ?? 0} · Kueri ekst: ${d.external_queries ?? 0} · Full-text: ${d.full_text_docs ?? 0}` : "-"),
+    title: "6. Pencarian Sumber",
+    format: (d) => (d ? `Lokal: ${d.local_docs ?? 0} · Kueri web: ${d.external_queries ?? 0} · Teks lengkap: ${d.full_text_docs ?? 0}` : "-"),
   },
   {
     key: "candidate_retrieval",
-    title: "7. Candidate Retrieval",
-    format: (d) => (d ? `${d.candidates ?? 0} kandidat (Win: ${d.winnowing ?? 0}, LSH: ${d.minhash ?? 0}, BM25: ${d.bm25 ?? 0})` : "-"),
+    title: "7. Seleksi Kandidat",
+    format: (d) => (d ? `${d.candidates ?? 0} kandidat pembanding lolos saringan awal` : "-"),
   },
   {
     key: "similarity_matching",
-    title: "8. Similarity Matching",
-    format: (d) => (d ? `Exact: ${d.exact_raw ?? 0} · Near: ${d.near_exact_raw ?? 0} · Lex: ${d.lexical_raw ?? 0} · Sem: ${d.semantic_raw ?? 0}` : "-"),
+    title: "8. Pencocokan Teks",
+    format: (d) => (d ? `Identik: ${d.exact_raw ?? 0} · Mirip Dekat: ${d.near_exact_raw ?? 0} · Frasa: ${d.lexical_raw ?? 0}` : "-"),
   },
   {
     key: "passage_alignment",
-    title: "9. Passage Alignment",
-    format: (d) => (d ? `${d.aligned_passages ?? 0} passage selaras` : "-"),
+    title: "9. Penyelarasan Bagian",
+    format: (d) => (d ? `${d.aligned_passages ?? 0} bagian teks disejajarkan` : "-"),
   },
   {
     key: "overlap_removal",
-    title: "10. Duplicate Overlap Removal",
-    format: (d) => (d ? `${d.passages_before ?? 0} -> ${d.verified_passages ?? 0} terhitung · ${d.duplicate_tokens_removed ?? 0} token overlap dihapus` : "-"),
+    title: "10. Atribusi Tunggal",
+    format: (d) => (d ? `${d.verified_passages ?? 0} bagian unik (${d.duplicate_tokens_removed ?? 0} tumpang tindih dicegah)` : "-"),
   },
   {
     key: "score_calculation",
-    title: "11. Score Calculation",
-    format: (d) => (d ? `${d.matched_words ?? 0} / ${d.eligible_words ?? 0} kata · SI ${Number(d.similarity_index || 0).toFixed(2)}%` : "-"),
+    title: "11. Hitung Persentase",
+    format: (d) => (d ? `${d.matched_words ?? 0} / ${d.eligible_words ?? 0} kata · ${Number(d.similarity_index || 0).toFixed(1)}%` : "-"),
   },
   {
     key: "report",
-    title: "12. Similarity Report",
-    format: (d) => (d ? `${d.sources ?? 0} sumber · ${String(d.report_number || "-")}` : "-"),
+    title: "12. Susun Laporan",
+    format: (d) => (d ? `${d.sources ?? 0} sumber · Nomor ${String(d.report_number || "-")}` : "-"),
   },
 ];
 
 export const ProcessFlowchart: React.FC<ProcessFlowchartProps> = ({ stageCounts }) => {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {STAGES.map((st, idx) => {
         const data = stageCounts[st.key];
         return (
-          <div
-            key={st.key}
-            className="card"
-            style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative" }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <strong style={{ fontSize: 13 }}>{st.title}</strong>
-              {idx < STAGES.length - 1 && <ArrowRight size={14} color="var(--text-muted)" aria-hidden="true" />}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
-              {st.format(data)}
-            </div>
-          </div>
+          <Card key={st.key} className="shadow-none">
+            <CardContent className="flex flex-col justify-between gap-2 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <strong className="text-sm font-semibold text-foreground">{st.title}</strong>
+                {idx < STAGES.length - 1 && (
+                  <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                )}
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground tabular-nums">
+                {st.format(data)}
+              </p>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

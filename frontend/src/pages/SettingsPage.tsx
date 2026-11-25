@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { CheckCircle2, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { apiFetch } from "../api/client";
-import { CheckSettings, ProviderHealthItem } from "../types";
+import { PageHeader } from "../components/PageHeader";
+import { CheckSettings } from "../types";
 
 interface SettingsPayload {
   default_exclusions: CheckSettings;
@@ -24,14 +31,14 @@ interface SettingsPayload {
 
 export const SettingsPage: React.FC = () => {
   const [payload, setPayload] = useState<SettingsPayload | null>(null);
-  const [providers, setProviders] = useState<ProviderHealthItem[]>([]);
   const [tokenInput, setTokenInput] = useState(() => localStorage.getItem("ng_api_token") || "");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<SettingsPayload>("/settings").then(setPayload).catch((e) => setError(e.message));
-    apiFetch<{ providers: ProviderHealthItem[] }>("/providers").then((d) => setProviders(d.providers)).catch(() => undefined);
+    apiFetch<SettingsPayload>("/settings")
+      .then(setPayload)
+      .catch((err: Error) => setError(err.message));
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -67,9 +74,9 @@ export const SettingsPage: React.FC = () => {
       );
     }
     return (
-      <div className="card">
-        <Skeleton className="h-6 w-56 mb-3" />
-        <Skeleton className="h-40 w-full" />
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-60 w-full" />
       </div>
     );
   }
@@ -77,199 +84,138 @@ export const SettingsPage: React.FC = () => {
   const ex = payload.default_exclusions;
 
   return (
-    <BlurFade duration={0.22}>
-      <div>
-        <div className="page-header">
-          <div>
-            <h2 className="page-title">Pengaturan Aplikasi &amp; Status Sistem</h2>
-            <p className="page-desc">
-              Konfigurasi default pengecualian, ambang kategori operasional, dan pemantauan modul lokal.
-            </p>
-          </div>
-        </div>
+    <BlurFade duration={0.2}>
+      <form onSubmit={handleSave} className="flex flex-col gap-6">
+        <PageHeader
+          title="Pengaturan Aplikasi"
+          description="Atur pengecualian default, batas kategori persentase kemiripan, dan lihat kesiapan modul lokal."
+          actions={
+            <Button type="submit">
+              <Save className="size-4" data-icon="inline-start" aria-hidden="true" />
+              <span>Simpan Pengaturan</span>
+            </Button>
+          }
+        />
 
-        {savedMsg && <div className="notice">{savedMsg}</div>}
+        {savedMsg && (
+          <Alert>
+            <CheckCircle2 className="size-4" />
+            <AlertTitle>Tersimpan</AlertTitle>
+            <AlertDescription>{savedMsg}</AlertDescription>
+          </Alert>
+        )}
+
         {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Gagal menyimpan pengaturan</AlertTitle>
+          <Alert variant="destructive">
+            <AlertTitle>Gagal menyimpan</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <form
-          onSubmit={handleSave}
-          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16, marginBottom: 20 }}
-        >
-          <div className="card">
-            <h3 className="section-title">Default Pengecualian</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 14 }}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ex.exclude_bibliography}
-                  onChange={(e) =>
-                    setPayload({ ...payload, default_exclusions: { ...ex, exclude_bibliography: e.target.checked } })
-                  }
-                />{" "}
-                Kecualikan Daftar Pustaka
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ex.exclude_citations}
-                  onChange={(e) => setPayload({ ...payload, default_exclusions: { ...ex, exclude_citations: e.target.checked } })}
-                />{" "}
-                Kecualikan Sitasi dalam Teks
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ex.exclude_quotes}
-                  onChange={(e) => setPayload({ ...payload, default_exclusions: { ...ex, exclude_quotes: e.target.checked } })}
-                />{" "}
-                Kecualikan Kutipan Langsung
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ex.exclude_toc}
-                  onChange={(e) => setPayload({ ...payload, default_exclusions: { ...ex, exclude_toc: e.target.checked } })}
-                />{" "}
-                Kecualikan Daftar Isi
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ex.exclude_cover}
-                  onChange={(e) => setPayload({ ...payload, default_exclusions: { ...ex, exclude_cover: e.target.checked } })}
-                />{" "}
-                Kecualikan Halaman Sampul
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={ex.exclude_common_phrases}
-                  onChange={(e) =>
-                    setPayload({ ...payload, default_exclusions: { ...ex, exclude_common_phrases: e.target.checked } })
-                  }
-                />{" "}
-                Kecualikan Frasa Umum
-              </label>
-              <div style={{ marginTop: 6 }}>
-                <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Minimal Kata Cocok (3–50)</label>
-                <input
-                  type="number"
-                  className="input"
-                  min={3}
-                  max={50}
-                  value={ex.min_match_words}
-                  onChange={(e) =>
-                    setPayload({ ...payload, default_exclusions: { ...ex, min_match_words: Number(e.target.value) || 8 } })
-                  }
-                />
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="text-base">Pengecualian Bawaan Pemeriksaan</CardTitle>
+              <CardDescription>Pengaturan awal yang otomatis terpilih saat membuka halaman Pemeriksaan Baru.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {[
+                { key: "exclude_bibliography", label: "Kecualikan Daftar Pustaka" },
+                { key: "exclude_citations", label: "Kecualikan Sitasi Dalam Teks" },
+                { key: "exclude_quotes", label: "Kecualikan Kutipan Langsung" },
+                { key: "exclude_toc", label: "Kecualikan Daftar Isi" },
+                { key: "exclude_common_phrases", label: "Kecualikan Frasa Akademik Umum" },
+              ].map((item) => (
+                <div key={item.key} className="flex items-center justify-between gap-3">
+                  <Label htmlFor={`set-${item.key}`} className="font-normal cursor-pointer">{item.label}</Label>
+                  <Switch
+                    id={`set-${item.key}`}
+                    checked={Boolean((ex as any)[item.key])}
+                    onCheckedChange={(val) =>
+                      setPayload({
+                        ...payload,
+                        default_exclusions: { ...ex, [item.key]: val },
+                      })
+                    }
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-          <div className="card">
-            <h3 className="section-title">Ambang Kategori Operasional &amp; Token</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Batas Bawah (&quot;Rendah&quot; &lt; X%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  className="input"
-                  value={payload.threshold_low}
-                  onChange={(e) => setPayload({ ...payload, threshold_low: Number(e.target.value) })}
-                />
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="text-base">Ambang Batas &amp; Token Lokal</CardTitle>
+              <CardDescription>Digunakan untuk mengelompokkan kategori Indeks Kemiripan rendah, sedang, dan tinggi.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="th-low">Batas Bawah (%)</Label>
+                  <Input
+                    id="th-low"
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={payload.threshold_low}
+                    onChange={(e) => setPayload({ ...payload, threshold_low: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="th-high">Batas Atas (%)</Label>
+                  <Input
+                    id="th-high"
+                    type="number"
+                    min={5}
+                    max={99}
+                    value={payload.threshold_high}
+                    onChange={(e) => setPayload({ ...payload, threshold_high: Number(e.target.value) })}
+                  />
+                </div>
               </div>
-              <div>
-                <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Batas Atas (&quot;Tinggi&quot; &gt;= Y%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  className="input"
-                  value={payload.threshold_high}
-                  onChange={(e) => setPayload({ ...payload, threshold_high: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  Bearer API Token (opsional, jika NG_API_TOKEN aktif)
-                </label>
-                <input
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="api-token">Token Akses API Lokal (Opsional)</Label>
+                <Input
+                  id="api-token"
                   type="password"
-                  className="input"
                   value={tokenInput}
                   onChange={(e) => setTokenInput(e.target.value)}
-                  placeholder="Kosongkan untuk mode lokal tanpa token"
+                  placeholder="Kosongkan bila berjalan pada mode localhost tunggal"
                 />
               </div>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-                Ambang di atas merupakan kategori operasional aplikasi yang dapat dikonfigurasi, bukan standar resmi institusi.
-              </p>
-              <button type="submit" className="btn btn-primary" style={{ alignSelf: "flex-start" }}>
-                <Save size={15} /> Simpan Pengaturan
-              </button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">Status Komponen Lokal</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
+            <div className="rounded-md border border-border p-3 flex flex-col gap-1">
+              <span className="text-muted-foreground">Pembaca PDF</span>
+              <span className="font-semibold text-foreground uppercase">{payload.system.pdf_backend}</span>
             </div>
-          </div>
-        </form>
-
-        <div className="card" style={{ marginBottom: 20 }}>
-          <h3 className="section-title">Status Modul Sistem (Read-Only)</h3>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.8 }}>
-            <li>
-              <strong>Backend PDF:</strong> {payload.system.pdf_backend}
-            </li>
-            <li>
-              <strong>Status OCR Lokal:</strong> {payload.system.ocr_message}
-            </li>
-            <li>
-              <strong>Status Modul Semantik:</strong> {payload.system.semantic_message}
-            </li>
-            <li>
-              <strong>Retensi Otomatis:</strong>{" "}
-              {payload.system.retention_days > 0 ? `${payload.system.retention_days} hari` : "Nonaktif (0 hari)"}
-            </li>
-          </ul>
-        </div>
-
-        <div className="card">
-          <h3 className="section-title">Status Penyedia Sumber (Source Providers)</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Provider</th>
-                  <th>Tipe</th>
-                  <th>Full-Text</th>
-                  <th>Batas Laju (Rate Limit)</th>
-                  <th>Konfigurasi &amp; Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {providers.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <strong>{p.name}</strong>
-                    </td>
-                    <td>{p.type}</td>
-                    <td>{p.full_text_capable ? "Ya" : "Metadata Saja"}</td>
-                    <td>{p.rate_limit || "-"}</td>
-                    <td>
-                      <span className={`badge ${p.configured ? "badge-SUCCESS" : "badge-neutral"}`} style={{ marginRight: 6 }}>
-                        {p.configured ? "Configured" : "NOT_CONFIGURED"}
-                      </span>
-                      <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{p.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+            <div className="rounded-md border border-border p-3 flex flex-col gap-1">
+              <span className="text-muted-foreground">OCR Dokumen Pindaian</span>
+              <div>
+                <Badge variant={payload.system.ocr_available ? "default" : "secondary"}>
+                  {payload.system.ocr_available ? "Tersedia" : "Tidak Aktif"}
+                </Badge>
+              </div>
+            </div>
+            <div className="rounded-md border border-border p-3 flex flex-col gap-1">
+              <span className="text-muted-foreground">Kemiripan Makna Lokal</span>
+              <div>
+                <Badge variant={payload.system.semantic_available ? "default" : "secondary"}>
+                  {payload.system.semantic_message}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
     </BlurFade>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Upload, Trash2, Database, BookMarked } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Database, Plus, Search, Trash2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,10 +11,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { BlurFade } from "@/components/ui/blur-fade";
-import { NumberTicker } from "@/components/ui/number-ticker";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiFetch } from "../api/client";
+import { PageHeader } from "../components/PageHeader";
 import { DocumentItem } from "../types";
 
 interface CorpusStats {
@@ -25,21 +31,21 @@ interface CorpusStats {
 
 export const CorpusPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
+  const [docs, setDocs] = useState<DocumentItem[] | null>(null);
   const [stats, setStats] = useState<CorpusStats | null>(null);
+  const [search, setSearch] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [authors, setAuthors] = useState("");
   const [year, setYear] = useState("");
   const [doi, setDoi] = useState("");
   const [url, setUrl] = useState("");
-  const [sourceType, setSourceType] = useState("jurnal_lokal");
   const [uploading, setUploading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = () => {
-    apiFetch<DocumentItem[]>("/corpus").then(setDocs).catch((e) => setError(e.message));
+    apiFetch<DocumentItem[]>("/corpus").then(setDocs).catch((e: Error) => setError(e.message));
     apiFetch<CorpusStats>("/corpus/stats").then(setStats).catch(() => undefined);
   };
 
@@ -63,7 +69,7 @@ export const CorpusPage: React.FC = () => {
       if (year.trim()) fd.append("year", year.trim());
       if (doi.trim()) fd.append("doi", doi.trim());
       if (url.trim()) fd.append("url", url.trim());
-      fd.append("source_type", sourceType);
+      fd.append("source_type", "LOCAL_CORPUS");
       await apiFetch("/corpus", { method: "POST", body: fd });
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -87,176 +93,154 @@ export const CorpusPage: React.FC = () => {
     loadData();
   };
 
-  return (
-    <BlurFade duration={0.22}>
-      <div>
-        <div className="page-header">
-          <div>
-            <h2 className="page-title">Korpus Sumber Lokal</h2>
-            <p className="page-desc">
-              Kelola koleksi dokumen pembanding lokal beserta metadata atribusi dan sidik jari Winnowing.
-            </p>
-          </div>
-          <Link to="/repositories" className="btn">
-            <BookMarked size={15} /> Repositori OAI-PMH
-          </Link>
-        </div>
+  const filtered = (docs || []).filter((d) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return `${d.title || ""} ${d.filename} ${(d.authors || []).join(" ")}`.toLowerCase().includes(q);
+  });
 
-        {stats && (
-          <div className="kpi-grid">
-            <div className="card">
-              <div className="stat-label">Total Dokumen Korpus</div>
-              <div className="stat-val">
-                <NumberTicker value={stats.total_documents} />
-              </div>
-            </div>
-            <div className="card">
-              <div className="stat-label">Total Kata Terindeks</div>
-              <div className="stat-val">
-                <NumberTicker value={stats.total_words} />
-              </div>
-            </div>
-            <div className="card">
-              <div className="stat-label">Total Fingerprint Winnowing</div>
-              <div className="stat-val">
-                <NumberTicker value={stats.total_fingerprints} />
-              </div>
-            </div>
-          </div>
-        )}
+  return (
+    <BlurFade duration={0.2}>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Korpus Sumber Pembanding"
+          description="Kelola koleksi dokumen pembanding lokal agar pemeriksaan berjalan cepat dan tidak bergantung internet."
+          badge={
+            stats ? (
+              <Badge variant="secondary" className="tabular-nums">
+                {stats.total_documents} sumber · {stats.total_words.toLocaleString("id-ID")} kata
+              </Badge>
+            ) : null
+          }
+        />
 
         {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Peringatan</AlertTitle>
+          <Alert variant="destructive">
+            <AlertTitle>Operasi korpus gagal</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <form className="card" onSubmit={handleUpload} style={{ marginBottom: 20 }}>
-          <h3 className="section-title">Tambah Dokumen ke Korpus</h3>
-          <div className="form-grid" style={{ marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Berkas (PDF/DOCX/TXT)</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="input"
-                accept=".pdf,.docx,.txt"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Judul Sumber</label>
-              <input
-                type="text"
-                className="input"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Opsional (otomatis dari metadata)"
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Penulis (pisahkan koma)</label>
-              <input
-                type="text"
-                className="input"
-                value={authors}
-                onChange={(e) => setAuthors(e.target.value)}
-                placeholder="mis. Budi Santoso, Siti Aminah"
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Tahun Terbit</label>
-              <input type="number" className="input" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024" />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>DOI</label>
-              <input type="text" className="input" value={doi} onChange={(e) => setDoi(e.target.value)} placeholder="10.xxxx/..." />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>URL Sumber</label>
-              <input type="url" className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Tipe Sumber</label>
-              <select className="input" value={sourceType} onChange={(e) => setSourceType(e.target.value)}>
-                <option value="jurnal_lokal">Jurnal Ilmiah Lokal</option>
-                <option value="skripsi_tesis">Skripsi / Tesis / Disertasi</option>
-                <option value="prosiding">Prosiding Seminar</option>
-                <option value="buku_referensi">Buku / Modul Ajar</option>
-                <option value="local_document">Dokumen Lokal Lainnya</option>
-              </select>
-            </div>
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={uploading}>
-            <Upload size={15} />
-            <span>{uploading ? "Mengindeks..." : "Unggah & Indeks ke Korpus"}</span>
-          </button>
-        </form>
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">Tambahkan Sumber Lokal Baru</CardTitle>
+            <CardDescription>Unggah jurnal, skripsi arsip, atau buku referensi (PDF, DOCX, TXT).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpload} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="flex flex-col gap-1.5 md:col-span-3">
+                <Label htmlFor="corpus-file">Berkas Sumber</Label>
+                <Input
+                  id="corpus-file"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,.html,.xml"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="corpus-title">Judul Referensi</Label>
+                <Input id="corpus-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Judul karya ilmiah" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="corpus-authors">Penulis</Label>
+                <Input id="corpus-authors" value={authors} onChange={(e) => setAuthors(e.target.value)} placeholder="Nama penulis" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="corpus-year">Tahun</Label>
+                <Input id="corpus-year" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="corpus-doi">DOI (Opsional)</Label>
+                <Input id="corpus-doi" value={doi} onChange={(e) => setDoi(e.target.value)} placeholder="10.xxxx/..." />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="corpus-url">URL Sumber (Opsional)</Label>
+                <Input id="corpus-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" disabled={uploading || !file} className="w-full">
+                  <Plus className="size-4" data-icon="inline-start" aria-hidden="true" />
+                  <span>{uploading ? "Mengindeks..." : "Tambahkan ke Korpus"}</span>
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
 
-        {docs.length === 0 ? (
-          <div className="empty-state">
-            <Database size={26} color="var(--text-muted)" />
-            <div style={{ fontWeight: 600 }}>Korpus lokal masih kosong</div>
-            <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-              Unggah dokumen referensi di atas atau panen dari <Link to="/repositories">Repositori Akademik (OAI-PMH)</Link>.
-            </div>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Judul / Berkas</th>
-                  <th>Penulis &amp; Tahun</th>
-                  <th>Tipe</th>
-                  <th>Status Akses</th>
-                  <th className="num">Kata</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {docs.map((d) => (
-                  <tr key={d.id}>
-                    <td>
-                      <strong>{d.title || d.filename}</strong>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                        {d.filename} {d.doi ? `· DOI: ${d.doi}` : ""}
-                      </div>
-                    </td>
-                    <td>
-                      {(d.authors || []).join(", ") || "-"}
-                      {d.year ? ` (${d.year})` : ""}
-                    </td>
-                    <td>{d.source_type}</td>
-                    <td>
-                      <span className="badge badge-EXCLUDED">{d.access_status}</span>
-                    </td>
-                    <td className="num">{d.word_count.toLocaleString("id-ID")}</td>
-                    <td>
-                      <button type="button" className="btn btn-danger" onClick={() => setPendingDelete(d)}>
-                        <Trash2 size={14} /> Hapus
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari judul sumber atau penulis..."
+            className="pl-9"
+          />
+        </div>
 
-        <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <Card className="shadow-none">
+          <CardContent className="p-0">
+            {!docs ? (
+              <div className="p-6 flex flex-col gap-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+                <Database className="size-8 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm font-medium text-foreground">Korpus sumber masih kosong</p>
+                <p className="text-xs text-muted-foreground">Tambahkan dokumen referensi atau panen repositori akademik OAI-PMH.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Judul &amp; Penulis</TableHead>
+                      <TableHead>Sumber</TableHead>
+                      <TableHead className="text-right">Kata</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="max-w-[360px]">
+                          <div className="truncate font-medium text-foreground">{d.title || d.filename}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {(d.authors || []).join(", ") || d.filename}
+                            {d.year ? ` (${d.year})` : ""}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{d.source_type}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{d.word_count.toLocaleString("id-ID")}</TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setPendingDelete(d)}>
+                            <Trash2 className="size-3.5 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Hapus Sumber dari Korpus Lokal?</AlertDialogTitle>
+              <AlertDialogTitle>Hapus Dokumen Korpus?</AlertDialogTitle>
               <AlertDialogDescription>
-                Sumber <strong>{pendingDelete?.title || pendingDelete?.filename}</strong> beserta indeks sidik jarinya akan
-                dihapus dari korpus pembanding lokal.
+                Dokumen <strong>{pendingDelete?.title || pendingDelete?.filename}</strong> tidak lagi dibandingkan pada pemeriksaan baru.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Batal</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete}>Ya, Hapus Sumber</AlertDialogAction>
+              <AlertDialogAction onClick={confirmDelete}>Hapus</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

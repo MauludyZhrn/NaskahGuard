@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { BookMarked, Plus, CheckCircle2, DownloadCloud, Trash2, RefreshCw } from "lucide-react";
+import { BookMarked, CheckCircle2, DownloadCloud, Plus, Trash2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,32 +11,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiFetch } from "../api/client";
+import { PageHeader } from "../components/PageHeader";
 import { OAIRepositoryItem } from "../types";
 
 export const RepositoriesPage: React.FC = () => {
-  const [repos, setRepos] = useState<OAIRepositoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [repos, setRepos] = useState<OAIRepositoryItem[] | null>(null);
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
-  const [repoType, setRepoType] = useState<"ojs" | "dspace" | "eprints" | "other">("ojs");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<OAIRepositoryItem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadRepos = () => {
-    setLoading(true);
     apiFetch<OAIRepositoryItem[]>("/oai/repositories")
-      .then((res) => {
-        setRepos(res);
-        setError(null);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then(setRepos)
+      .catch((err: Error) => setError(err.message));
   };
 
   useEffect(() => {
@@ -51,11 +51,11 @@ export const RepositoriesPage: React.FC = () => {
       await apiFetch("/oai/repositories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), base_url: baseUrl.trim(), repo_type: repoType }),
+        body: JSON.stringify({ name: name.trim(), base_url: baseUrl.trim(), repo_type: "OAI-PMH" }),
       });
       setName("");
       setBaseUrl("");
-      setMessage("Repositori OAI-PMH berhasil ditambahkan.");
+      setMessage("Repositori akademik OAI-PMH berhasil ditambahkan.");
       loadRepos();
     } catch (err: any) {
       setError(err.message);
@@ -70,7 +70,7 @@ export const RepositoriesPage: React.FC = () => {
       const res = await apiFetch<{ identify?: { repositoryName?: string } }>(`/oai/repositories/${id}/verify`, {
         method: "POST",
       });
-      setMessage(`Verifikasi berhasil: ${res.identify?.repositoryName || "OAI-PMH valid"}.`);
+      setMessage(`Verifikasi berhasil: ${res.identify?.repositoryName || "Endpoint OAI-PMH valid"}.`);
       loadRepos();
     } catch (err: any) {
       setError(err.message);
@@ -84,16 +84,13 @@ export const RepositoriesPage: React.FC = () => {
     setError(null);
     setMessage(null);
     try {
-      const res = await apiFetch<{ summary: { records_seen?: number; records_harvested?: number; fulltext_indexed?: number } }>(
+      const res = await apiFetch<{ summary: { records_seen?: number; fulltext_indexed?: number } }>(
         `/oai/repositories/${id}/harvest`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ max_records: 15, download_pdfs: true }),
-        }
+        { method: "POST" }
       );
-      const seen = res.summary?.records_harvested ?? res.summary?.records_seen ?? 0;
-      setMessage(`Panen selesai: ${seen} rekaman diperiksa, ${res.summary?.fulltext_indexed ?? 0} full-text terindeks.`);
+      setMessage(
+        `Panen selesai: ${res.summary?.records_seen ?? 0} entri ditemukan, ${res.summary?.fulltext_indexed ?? 0} dokumen penuh diindeks.`
+      );
       loadRepos();
     } catch (err: any) {
       setError(err.message);
@@ -104,179 +101,124 @@ export const RepositoriesPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
-    setBusyId(pendingDelete.id);
-    try {
-      await apiFetch(`/oai/repositories/${pendingDelete.id}`, { method: "DELETE" });
-      setPendingDelete(null);
-      loadRepos();
-    } catch (err: any) {
-      setError(err.message);
-      setPendingDelete(null);
-    } finally {
-      setBusyId(null);
-    }
+    await apiFetch(`/oai/repositories/${pendingDelete.id}`, { method: "DELETE" });
+    setPendingDelete(null);
+    loadRepos();
   };
 
   return (
-    <BlurFade duration={0.22}>
-      <div>
-        <div className="page-header">
-          <div>
-            <h2 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <BookMarked size={21} /> Repositori Akademik (OAI-PMH)
-            </h2>
-            <p className="page-desc">
-              Daftarkan endpoint OAI-PMH resmi jurnal OJS, DSpace, atau EPrints kampus untuk memperkaya korpus lokal secara legal.
-            </p>
-          </div>
-          <button type="button" className="btn" onClick={loadRepos}>
-            <RefreshCw size={14} /> Muat Ulang
-          </button>
-        </div>
+    <BlurFade duration={0.2}>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Repositori Akademik (OAI-PMH)"
+          description="Hubungkan repositori skripsi, tesis, dan jurnal institusi Indonesia (seperti EPrints atau OJS) untuk memperkaya korpus pembanding lokal."
+        />
 
-        {message && <div className="notice">{message}</div>}
+        {message && (
+          <Alert>
+            <CheckCircle2 className="size-4" />
+            <AlertTitle>Informasi Repositori</AlertTitle>
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
+        )}
+
         {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Peringatan OAI-PMH</AlertTitle>
+          <Alert variant="destructive">
+            <AlertTitle>Terjadi kendala</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <form className="card" onSubmit={handleAdd} style={{ marginBottom: 18 }}>
-          <h3 className="section-title">Tambah Repositori OAI-PMH</h3>
-          <div className="form-grid" style={{ marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Nama Repositori / Jurnal</label>
-              <input
-                className="input"
-                placeholder="Mis. Jurnal Informatika Kampus (OJS)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Base URL OAI-PMH Publik</label>
-              <input
-                className="input"
-                placeholder="https://jurnal.contoh.ac.id/index.php/jif/oai"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Platform</label>
-              <select className="input" value={repoType} onChange={(e) => setRepoType(e.target.value as any)}>
-                <option value="ojs">OJS (Open Journal Systems)</option>
-                <option value="dspace">DSpace</option>
-                <option value="eprints">EPrints</option>
-                <option value="other">Lainnya</option>
-              </select>
-            </div>
-          </div>
-          <button type="submit" className="btn btn-primary">
-            <Plus size={15} /> Daftarkan Repositori
-          </button>
-        </form>
-
-        <div className="card">
-          <h3 className="section-title">Daftar Repositori Terdaftar ({repos.length})</h3>
-          {loading ? (
-            <Skeleton className="h-24 w-full" />
-          ) : repos.length === 0 ? (
-            <div className="empty-state" style={{ padding: "24px 16px" }}>
-              <BookMarked size={24} color="var(--text-muted)" />
-              <div style={{ fontWeight: 600 }}>Belum ada repositori OAI-PMH terdaftar</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                Tambahkan endpoint OJS, DSpace, atau EPrints di atas untuk mulai memanen metadata &amp; PDF Open Access.
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="text-base">Daftarkan Endpoint OAI-PMH</CardTitle>
+            <CardDescription>Masukkan nama kampus/jurnal dan URL endpoint OAI-PMH yang valid.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAdd} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="repo-name">Nama Repositori</Label>
+                <Input id="repo-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Misal: Repositori Universitas X" />
               </div>
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Repositori</th>
-                    <th>Tipe</th>
-                    <th>Status</th>
-                    <th className="num">Rekaman</th>
-                    <th className="num">Full-Text</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {repos.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <strong>{r.identified_name || r.name}</strong>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{r.base_url}</div>
-                        {r.last_error && <div style={{ fontSize: 11.5, color: "var(--exact-text)" }}>{r.last_error}</div>}
-                      </td>
-                      <td>{r.repo_type.toUpperCase()}</td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            r.status === "VERIFIED" ? "badge-SUCCESS" : r.status === "ERROR" ? "badge-EXACT" : "badge-neutral"
-                          }`}
-                        >
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="num">{r.records_harvested}</td>
-                      <td className="num">{r.fulltext_indexed}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button
-                            type="button"
-                            className="btn"
-                            style={{ fontSize: 12, minHeight: 30, padding: "4px 8px" }}
-                            disabled={busyId === r.id}
-                            onClick={() => handleVerify(r.id)}
-                          >
-                            <CheckCircle2 size={12} /> Verifikasi
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ fontSize: 12, minHeight: 30, padding: "4px 8px" }}
-                            disabled={busyId === r.id}
-                            onClick={() => handleHarvest(r.id)}
-                          >
-                            <DownloadCloud size={12} /> Panen
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-danger"
-                            style={{ fontSize: 12, minHeight: 30, padding: "4px 8px" }}
-                            disabled={busyId === r.id}
-                            onClick={() => setPendingDelete(r)}
-                            aria-label={`Hapus ${r.name}`}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="repo-url">URL OAI-PMH</Label>
+                <Input id="repo-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://repository.kampus.ac.id/cgi/oai2" />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" disabled={!name.trim() || !baseUrl.trim()} className="w-full">
+                  <Plus className="size-4" data-icon="inline-start" aria-hidden="true" />
+                  <span>Simpan Repositori</span>
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
 
-        <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <Card className="shadow-none">
+          <CardContent className="p-0">
+            {!repos ? (
+              <div className="p-6"><Skeleton className="h-32 w-full" /></div>
+            ) : repos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+                <BookMarked className="size-8 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm font-medium text-foreground">Belum ada repositori OAI-PMH terdaftar</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Repositori</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Terpanen / Diindeks</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {repos.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <div className="font-medium text-foreground">{r.name}</div>
+                          <div className="text-xs text-muted-foreground">{r.base_url}</div>
+                        </TableCell>
+                        <TableCell><Badge variant="secondary">{r.status}</Badge></TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {r.records_harvested} / {r.fulltext_indexed}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => handleVerify(r.id)}>
+                              Uji
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => handleHarvest(r.id)}>
+                              <DownloadCloud className="size-3.5" data-icon="inline-start" />
+                              <span>Panen</span>
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setPendingDelete(r)}>
+                              <Trash2 className="size-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Hapus Repositori OAI-PMH?</AlertDialogTitle>
+              <AlertDialogTitle>Hapus Repositori Akademik?</AlertDialogTitle>
               <AlertDialogDescription>
-                Entri repositori <strong>{pendingDelete?.name}</strong> ({pendingDelete?.base_url}) akan dihapus dari daftar
-                harvester. Dokumen yang sudah terindeks di korpus lokal tidak ikut terhapus.
+                Menghapus <strong>{pendingDelete?.name}</strong> menghentikan penarikan indeks dari repositori tersebut.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Batal</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete}>Ya, Hapus</AlertDialogAction>
+              <AlertDialogAction onClick={confirmDelete}>Hapus</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

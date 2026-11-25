@@ -20,14 +20,14 @@ export const SimilarityGauge: React.FC<SimilarityGaugeProps> = ({
   const circumference = Math.PI * r;
   const filled = (clamped / 100) * circumference;
 
-  let strokeColor = "#2563eb";
-  if (clamped >= thresholdHigh) strokeColor = "#dc2626";
-  else if (clamped >= thresholdLow) strokeColor = "#ea580c";
+  let strokeColor = "var(--semantic-border)";
+  if (clamped >= thresholdHigh) strokeColor = "var(--exact-border)";
+  else if (clamped >= thresholdLow) strokeColor = "var(--near-border)";
 
   return (
     <div
-      style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}
-      aria-label={`Similarity Index ${clamped.toFixed(2)} persen, kategori ${level}`}
+      className="inline-flex shrink-0 flex-col items-center"
+      aria-label={`Indeks Kemiripan ${clamped.toFixed(2)} persen, kategori ${level}`}
     >
       <svg width="128" height="74" viewBox="0 0 128 74">
         <path
@@ -51,10 +51,10 @@ export const SimilarityGauge: React.FC<SimilarityGaugeProps> = ({
           textAnchor="middle"
           fontSize="18"
           fontWeight="700"
-          fill="var(--text)"
-          style={{ fontVariantNumeric: "tabular-nums" }}
+          fill="currentColor"
+          className="text-foreground tabular-nums"
         >
-          {clamped.toFixed(2)}%
+          {clamped.toFixed(1)}%
         </text>
       </svg>
     </div>

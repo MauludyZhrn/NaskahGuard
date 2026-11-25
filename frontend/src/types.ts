@@ -1,3 +1,5 @@
+export type CheckMode = "PLAGIARISM_ONLY" | "AI_ONLY" | "COMBINED";
+
 export interface AppConfig {
   app_name: string;
   version: string;
@@ -40,6 +42,8 @@ export interface DocumentItem {
 }
 
 export interface CheckSettings {
+  check_mode?: CheckMode;
+  ai_model_id?: string | null;
   exclude_bibliography: boolean;
   exclude_quotes: boolean;
   exclude_citations: boolean;
@@ -104,6 +108,64 @@ export interface OAIRepositoryItem {
   created_at: string | null;
 }
 
+export interface AiSignalItem {
+  key: string;
+  title: string;
+  direction: "ai" | "human" | "neutral";
+  detail: string;
+}
+
+export interface AiParagraphItem {
+  paragraph_index: number;
+  char_start: number;
+  char_end: number;
+  word_count: number;
+  text: string;
+  classification: "HUMAN_LIKELY" | "MIXED_UNCERTAIN" | "AI_LIKELY" | "INSUFFICIENT_DATA";
+  classification_label: string;
+  ai_likelihood_pct: number | null;
+  uncertainty_pct: number | null;
+  highlighted: boolean;
+  reasons: string[];
+}
+
+export interface AiHighlightItem {
+  paragraph_index: number;
+  char_start: number;
+  char_end: number;
+  classification: string;
+  classification_label: string;
+  ai_likelihood_pct: number | null;
+  reasons: string[];
+  excerpt: string;
+}
+
+export interface AiReportPayload {
+  score_available: boolean;
+  ai_likelihood_pct: number | null;
+  classification: "HUMAN_LIKELY" | "MIXED_UNCERTAIN" | "AI_LIKELY" | "INSUFFICIENT_DATA";
+  classification_label: string;
+  classification_description: string;
+  confidence_label: string;
+  uncertainty_pct: number | null;
+  word_count: number;
+  min_words_required: number;
+  language: {
+    code: string;
+    label: string;
+    supported: boolean;
+  };
+  model_used: string;
+  requested_model?: string;
+  summary_id: string;
+  signals: AiSignalItem[];
+  paragraphs: AiParagraphItem[];
+  highlights: AiHighlightItem[];
+  feature_snapshot?: Record<string, number>;
+  limitations: string[];
+  disclaimer: string;
+}
+
 export interface CheckSummary {
   id: string;
   report_number: string;
@@ -111,12 +173,14 @@ export interface CheckSummary {
   document_filename: string | null;
   document_title: string | null;
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
+  mode?: CheckMode;
   stage: string;
   progress: number;
   settings: CheckSettings;
   stage_counts: Record<string, Record<string, unknown>>;
   metrics: Record<string, unknown>;
   coverage: Record<string, unknown>;
+  ai_report?: AiReportPayload | null;
   error: string | null;
   created_at: string;
   started_at: string | null;
@@ -217,6 +281,7 @@ export interface FullReport {
   check_id: string;
   report_number: string;
   status: string;
+  mode?: CheckMode;
   stage: string;
   created_at: string | null;
   started_at: string | null;
@@ -236,6 +301,14 @@ export interface FullReport {
     extra: Record<string, unknown>;
   };
   settings: CheckSettings;
+  ai_report?: AiReportPayload | null;
+  plain_summary?: {
+    similarity_answer: string;
+    sources_answer: string;
+    ai_answer: string;
+    review_answer: string;
+    coverage_answer: string;
+  };
   metrics: {
     similarity_index: number;
     raw_similarity: number;
@@ -256,7 +329,7 @@ export interface FullReport {
     semantic_candidates_count: number;
     semantic_candidate_words: number;
     semantic_status: string;
-    operational_category: {
+    operational_category?: {
       level: string;
       threshold_low: number;
       threshold_high: number;
@@ -294,14 +367,14 @@ export interface FullReport {
     stage_timings_ms?: Record<string, number>;
   };
   coverage: {
-    level: string;
-    full_text_sources_compared: number;
-    metadata_only_sources: number;
-    access_denied_sources: number;
-    fetch_failed_sources: number;
-    external_sources_enabled: boolean;
-    notes: string[];
-    statement: string;
+    level?: string;
+    full_text_sources_compared?: number;
+    metadata_only_sources?: number;
+    access_denied_sources?: number;
+    fetch_failed_sources?: number;
+    external_sources_enabled?: boolean;
+    notes?: string[];
+    statement?: string;
     source_metrics?: {
       search_results_count?: number;
       total_sources_discovered: number;
@@ -381,4 +454,83 @@ export interface SourceViewerPayload {
     src_page: number | null;
     counted: boolean;
   }>;
+}
+
+export interface ModelCatalogItem {
+  id: string;
+  name: string;
+  family: string;
+  source_reference: string;
+  license: string;
+  tier: "BUILTIN_CPU" | "OPTIONAL_HF";
+  languages: string[];
+  indonesian_support: string;
+  requirements: {
+    runtime: string;
+    min_ram_mb: number;
+    disk_mb: number;
+    offline_capable: boolean;
+    dependencies_installed: boolean;
+    missing_packages?: string[];
+  };
+  installed: boolean;
+  active?: boolean;
+  status: string;
+  artifact_path: string;
+  limitations: string[];
+}
+
+export interface DashboardData {
+  total_documents_checked: number;
+  total_submissions: number;
+  average_similarity: number | null;
+  average_ai_likelihood: number | null;
+  ai_stats?: {
+    total_ai_analyzed: number;
+    total_ai_only: number;
+    total_combined: number;
+    total_plagiarism_only: number;
+    classification_counts: Record<string, number>;
+  };
+  recent_reports: Array<{
+    check_id: string;
+    report_number: string;
+    document_id: string;
+    filename: string;
+    title: string;
+    mode?: CheckMode;
+    similarity_index: number;
+    matched_words: number;
+    eligible_words: number;
+    ai_likelihood_pct?: number | null;
+    ai_classification?: string | null;
+    ai_classification_label?: string | null;
+    finished_at: string | null;
+  }>;
+  recent_activity: Array<{
+    id: number;
+    ts: string | null;
+    actor: string;
+    action: string;
+    target_type: string;
+    target_id: string | null;
+    details: Record<string, unknown>;
+  }>;
+  trend: Array<{
+    report_number: string;
+    mode?: CheckMode;
+    similarity_index: number;
+    ai_likelihood_pct?: number | null;
+    date: string;
+  }>;
+  corpus_stats: {
+    total_documents: number;
+    fulltext_sources_available: number;
+    total_words: number;
+    total_fingerprints: number;
+  };
+  provider_stats: {
+    total_queries: number;
+    total_acquisitions: number;
+  };
 }

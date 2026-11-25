@@ -1,43 +1,58 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
-  LayoutDashboard,
-  FilePlus2,
-  History,
-  FolderOpen,
-  Database,
-  Globe,
-  BookMarked,
-  FileBarChart2,
+  Activity,
   BarChart3,
-  Settings,
-  Sun,
-  Moon,
-  Menu,
-  X,
-  PanelLeftClose,
-  PanelLeftOpen,
+  BookMarked,
+  Bot,
   ChevronDown,
   ChevronRight,
+  Cpu,
+  Database,
+  FilePlus2,
+  FileSearch2,
+  FolderOpen,
+  Globe,
+  History,
+  Layers,
+  LayoutDashboard,
+  Menu,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  ShieldCheck,
+  Sun,
+  X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { AppConfig } from "../types";
 
 interface LayoutProps {
   config: AppConfig | null;
 }
 
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  end?: boolean;
+}
+
 interface NavGroup {
   id: string;
   label: string;
-  items: Array<{ to: string; label: string; icon: React.ComponentType<{ size?: number | string }>; end?: boolean }>;
+  items: NavItem[];
 }
 
 const NAV_GROUPS: NavGroup[] = [
   {
     id: "utama",
-    label: "Utama",
+    label: "UTAMA",
     items: [
       { to: "/", label: "Dasbor", icon: LayoutDashboard, end: true },
       { to: "/new-check", label: "Pemeriksaan Baru", icon: FilePlus2 },
@@ -45,8 +60,17 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: "pemeriksaan",
+    label: "PEMERIKSAAN",
+    items: [
+      { to: "/plagiarism-checks", label: "Deteksi Plagiasi", icon: FileSearch2 },
+      { to: "/ai-checks", label: "Deteksi Tulisan AI", icon: Bot },
+      { to: "/combined-reports", label: "Laporan Gabungan", icon: Layers },
+    ],
+  },
+  {
     id: "sumber",
-    label: "Sumber",
+    label: "SUMBER",
     items: [
       { to: "/documents", label: "Pustaka Dokumen", icon: FolderOpen },
       { to: "/corpus", label: "Korpus Sumber", icon: Database },
@@ -56,16 +80,19 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: "analisis",
-    label: "Analisis",
+    label: "ANALISIS",
     items: [
-      { to: "/reports", label: "Laporan Kemiripan", icon: FileBarChart2 },
-      { to: "/analytics", label: "Analitik", icon: BarChart3 },
+      { to: "/analytics", label: "Analitik Plagiasi", icon: BarChart3, end: true },
+      { to: "/analytics/ai", label: "Analitik AI", icon: Activity },
     ],
   },
   {
     id: "pengaturan",
-    label: "Pengaturan",
-    items: [{ to: "/settings", label: "Pengaturan", icon: Settings }],
+    label: "PENGATURAN",
+    items: [
+      { to: "/settings", label: "Pengaturan", icon: Settings },
+      { to: "/models", label: "Manajemen Model", icon: Cpu },
+    ],
   },
 ];
 
@@ -90,161 +117,205 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
     localStorage.setItem("ng_sidebar_collapsed", String(collapsed));
   }, [collapsed]);
 
-  useEffect(() => {
-    document.title = `${appName} — Pemeriksa Kemiripan Dokumen Akademik`;
-  }, [appName]);
-
   const toggleGroup = (id: string) => {
     setClosedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const renderNavLink = (item: NavItem) => {
+    const Icon = item.icon;
+    const linkEl = (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.end}
+        onClick={() => setMobileOpen(false)}
+        className={({ isActive }) =>
+          cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors cursor-pointer",
+            collapsed && "md:justify-center md:px-2",
+            isActive
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          )
+        }
+      >
+        <Icon className="size-4 shrink-0" aria-hidden="true" />
+        <span className={cn("truncate", collapsed && "md:hidden")}>{item.label}</span>
+      </NavLink>
+    );
+
+    if (collapsed) {
+      return (
+        <Tooltip key={item.to}>
+          <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+          <TooltipContent side="right" className="hidden md:block">
+            {item.label}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    return linkEl;
+  };
+
   return (
-    <TooltipProvider delayDuration={120}>
-      <div className="app-shell">
-        <div
-          className={`drawer-backdrop ${mobileOpen ? "open" : ""}`}
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
+    <TooltipProvider delayDuration={180}>
+      <div className="flex min-h-screen w-full bg-background text-foreground">
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/45 md:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+        )}
 
         <aside
-          className={`sidebar ${collapsed ? "collapsed" : ""} ${mobileOpen ? "open" : ""}`}
           aria-label="Navigasi utama"
-          data-collapsed={collapsed ? "true" : "false"}
+          className={cn(
+            "flex-col border-r border-border bg-card transition-all duration-200",
+            collapsed ? "md:w-[70px]" : "md:w-[260px]",
+            mobileOpen
+              ? "fixed inset-y-0 left-0 z-50 flex w-[272px]"
+              : "hidden md:sticky md:top-0 md:z-30 md:flex md:h-screen"
+          )}
         >
-          <div className="brand-row">
-            <div className="brand-mark">
-              <span className="brand-icon" aria-hidden="true">
-                NG
-              </span>
-              {!collapsed && (
-                <div style={{ minWidth: 0 }}>
-                  <h1 className="brand-title">{appName}</h1>
-                  <div className="brand-sub">Audit Integritas Akademik</div>
-                </div>
-              )}
+          {/* Brand Header */}
+          <div className="flex h-14 items-center justify-between gap-2 border-b border-border px-3">
+            <div className={cn("flex items-center gap-2.5 min-w-0", collapsed && "md:justify-center md:w-full")}>
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <ShieldCheck className="size-4" aria-hidden="true" />
+              </div>
+              <div className={cn("flex flex-col min-w-0", collapsed && "md:hidden")}>
+                <span className="truncate font-serif text-base font-bold leading-tight text-foreground">
+                  {appName}
+                </span>
+                <span className="truncate text-[11px] text-muted-foreground">Integritas Akademik</span>
+              </div>
             </div>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="btn btn-icon desktop-collapse-btn"
-                  onClick={() => setCollapsed((c) => !c)}
-                  aria-label={collapsed ? "Perluas sidebar" : "Ciutkan sidebar"}
-                  aria-expanded={!collapsed}
-                >
-                  {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {collapsed ? "Perluas sidebar" : "Ciutkan sidebar"}
-              </TooltipContent>
-            </Tooltip>
-
-            <button
+            <Button
               type="button"
-              className="btn btn-icon mobile-toggle"
-              aria-label="Tutup menu navigasi"
-              onClick={() => setMobileOpen(false)}
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex size-8 shrink-0"
+              onClick={() => setCollapsed((c) => !c)}
+              aria-label={collapsed ? "Perluas bilah samping" : "Ciutkan bilah samping"}
+              title={collapsed ? "Perluas menu" : "Ciutkan menu"}
             >
-              <X size={16} />
-            </button>
+              {collapsed ? (
+                <PanelLeftOpen className="size-4" aria-hidden="true" />
+              ) : (
+                <PanelLeftClose className="size-4" aria-hidden="true" />
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="md:hidden size-8 shrink-0"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Tutup menu navigasi"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </Button>
           </div>
 
-          <nav className="nav-scroll">
-            {NAV_GROUPS.map((group) => {
-              const isOpen = !(Boolean(closedGroups[group.id]) && !collapsed);
-              return (
-                <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleGroup(group.id)}>
-                  {!collapsed && (
-                    <CollapsibleTrigger asChild>
-                      <button type="button" className="nav-group-header" aria-expanded={isOpen}>
-                        <span>{group.label}</span>
-                        {!isOpen ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
-                      </button>
+          {/* Navigation Groups */}
+          <nav className="flex-1 overflow-y-auto px-2.5 py-3">
+            <div className="flex flex-col gap-4">
+              {NAV_GROUPS.map((group) => {
+                const isOpen = !closedGroups[group.id];
+                if (collapsed) {
+                  return (
+                    <div key={group.id} className="hidden md:flex flex-col gap-1">
+                      <Separator className="my-1" />
+                      {group.items.map(renderNavLink)}
+                    </div>
+                  );
+                }
+                return (
+                  <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleGroup(group.id)}>
+                    <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground hover:text-foreground cursor-pointer">
+                      <span>{group.label}</span>
+                      {isOpen ? (
+                        <ChevronDown className="size-3.5" aria-hidden="true" />
+                      ) : (
+                        <ChevronRight className="size-3.5" aria-hidden="true" />
+                      )}
                     </CollapsibleTrigger>
-                  )}
+                    <CollapsibleContent className="mt-1 flex flex-col gap-0.5">
+                      {group.items.map(renderNavLink)}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
 
-                  <CollapsibleContent forceMount={collapsed ? true : undefined}>
-                    {isOpen && (
-                      <div className="nav-list">
-                        {group.items.map((item) => {
-                          const Icon = item.icon;
-                          const linkNode = (
-                            <NavLink
-                              key={item.to}
-                              to={item.to}
-                              end={item.end}
-                              onClick={() => setMobileOpen(false)}
-                              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-                              aria-label={item.label}
-                            >
-                              <Icon size={18} />
-                              {!collapsed && <span>{item.label}</span>}
-                            </NavLink>
-                          );
-                          if (!collapsed) return linkNode;
-                          return (
-                            <Tooltip key={item.to}>
-                              <TooltipTrigger asChild>{linkNode}</TooltipTrigger>
-                              <TooltipContent side="right">{item.label}</TooltipContent>
-                            </Tooltip>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
+              {/* Mobile expanded view even if desktop state was collapsed */}
+              {collapsed &&
+                NAV_GROUPS.map((group) => (
+                  <div key={`mob-${group.id}`} className="flex flex-col gap-1 md:hidden">
+                    <span className="px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground">
+                      {group.label}
+                    </span>
+                    {group.items.map(renderNavLink)}
+                  </div>
+                ))}
+            </div>
           </nav>
 
-          {!collapsed && (
-            <div className="sidebar-footer">
-              <div>Mode: Local-First (SQLite)</div>
-              {config && <div>PDF: {config.pdf_backend} · Maks {config.max_upload_mb} MB</div>}
-            </div>
-          )}
+          {/* Footer Theme & Privacy */}
+          <div className="border-t border-border p-2.5 flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size={collapsed ? "icon" : "sm"}
+              className={cn("w-full", !collapsed && "justify-start")}
+              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+              aria-label="Ubah tema tampilan"
+              title="Ubah tema Terang / Gelap"
+            >
+              {theme === "light" ? (
+                <Moon className="size-4" data-icon={collapsed ? undefined : "inline-start"} aria-hidden="true" />
+              ) : (
+                <Sun className="size-4" data-icon={collapsed ? undefined : "inline-start"} aria-hidden="true" />
+              )}
+              {!collapsed && <span>{theme === "light" ? "Mode Gelap" : "Mode Terang"}</span>}
+            </Button>
+            {!collapsed && (
+              <p className="px-1 text-[11px] leading-snug text-muted-foreground">
+                Lokal &amp; Terkendali Pengguna · v{config?.version || "1.0"}
+              </p>
+            )}
+          </div>
         </aside>
 
-        <div className="main-area">
-          <header className="topbar">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <button
-                type="button"
-                className="btn btn-icon mobile-toggle"
-                aria-label="Buka menu navigasi"
-                onClick={() => setMobileOpen(true)}
-              >
-                <Menu size={17} />
-              </button>
-              <span
-                style={{
-                  fontSize: 13.5,
-                  color: "var(--text-secondary)",
-                  fontWeight: 500,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Platform Pemeriksaan Kemiripan &amp; Intelijen Sumber Akademik
-              </span>
-            </div>
-
-            <button
+        {/* Main Workspace Column */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Mobile Only Top Header (hidden on md+ so zero duplicate nav on desktop) */}
+          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
+            <Button
               type="button"
-              className="btn"
-              onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-              aria-label={theme === "light" ? "Aktifkan mode gelap" : "Aktifkan mode terang"}
+              variant="outline"
+              size="sm"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Buka menu navigasi"
             >
-              {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
-              <span>{theme === "light" ? "Mode Gelap" : "Mode Terang"}</span>
-            </button>
+              <Menu className="size-4" data-icon="inline-start" aria-hidden="true" />
+              <span>Menu</span>
+            </Button>
+            <span className="font-serif text-base font-bold text-foreground">{appName}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+              aria-label="Ubah tema"
+            >
+              {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4" />}
+            </Button>
           </header>
 
-          <main className="page-content">
+          <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
             <Outlet />
           </main>
         </div>

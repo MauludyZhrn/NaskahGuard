@@ -1,53 +1,27 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { BarChart3 } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Activity, BarChart3 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "../api/client";
-import { ProviderHealthItem } from "../types";
+import { PageHeader } from "../components/PageHeader";
+import { DashboardData } from "../types";
 
-interface DashboardPayload {
-  total_documents_checked: number;
-  average_similarity: number | null;
-  trend: Array<{ report_number: string; similarity_index: number; date: string }>;
-  recent_reports: Array<{
-    check_id: string;
-    report_number: string;
-    filename: string;
-    similarity_index: number;
-    matched_words: number;
-    eligible_words: number;
-  }>;
-  corpus_stats: {
-    total_documents: number;
-    fulltext_sources_available: number;
-    total_words: number;
-    total_fingerprints: number;
-  };
-  provider_stats: {
-    total_queries: number;
-    total_acquisitions: number;
-  };
+interface AnalyticsProps {
+  focusMode?: "plagiarism" | "ai";
 }
 
-export const AnalyticsOverviewPage: React.FC = () => {
-  const [dash, setDash] = useState<DashboardPayload | null>(null);
-  const [providers, setProviders] = useState<ProviderHealthItem[]>([]);
+export const AnalyticsOverviewPage: React.FC<AnalyticsProps> = ({ focusMode = "plagiarism" }) => {
+  const [dash, setDash] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<DashboardPayload>("/dashboard"),
-      apiFetch<{ providers: ProviderHealthItem[] }>("/providers"),
-    ])
-      .then(([d, p]) => {
-        setDash(d);
-        setProviders(p.providers || []);
-      })
-      .catch((e) => setError(e.message));
+    apiFetch<DashboardData>("/dashboard")
+      .then(setDash)
+      .catch((err: Error) => setError(err.message));
   }, []);
 
   if (error) {
@@ -58,158 +32,150 @@ export const AnalyticsOverviewPage: React.FC = () => {
       </Alert>
     );
   }
+
   if (!dash) {
     return (
-      <div className="card">
-        <Skeleton className="h-6 w-52 mb-3" />
-        <Skeleton className="h-44 w-full" />
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
+  const isAi = focusMode === "ai";
+  const aiCounts = dash.ai_stats?.classification_counts || {};
+  const classChart = [
+    { name: "Cenderung Manusia", jumlah: aiCounts.HUMAN_LIKELY ?? 0 },
+    { name: "Campuran / Ragu", jumlah: aiCounts.MIXED_UNCERTAIN ?? 0 },
+    { name: "Terindikasi AI", jumlah: aiCounts.AI_LIKELY ?? 0 },
+    { name: "Kurang Bukti", jumlah: aiCounts.INSUFFICIENT_DATA ?? 0 },
+  ];
+
   return (
-    <BlurFade duration={0.22}>
-      <div>
-        <div className="page-header">
-          <div>
-            <h2 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <BarChart3 size={21} /> Analitik Sistem &amp; Pencarian
-            </h2>
-            <p className="page-desc">
-              Ringkasan metrik lintas pemeriksaan, perkembangan korpus lokal, dan efektivitas provider sumber.
-            </p>
-          </div>
-        </div>
+    <BlurFade duration={0.2}>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title={isAi ? "Analitik Deteksi Tulisan AI" : "Analitik Pemeriksaan Plagiasi"}
+          description={
+            isAi
+              ? "Statistik sebaran klasifikasi pola penulisan AI secara lokal tanpa mencampurkan skor plagiasi."
+              : "Ringkasan agregat indeks kemiripan dan cakupan korpus lokal dari seluruh pemeriksaan selesai."
+          }
+        />
 
-        <div className="kpi-grid">
-          <div className="card">
-            <div className="stat-label">Pemeriksaan Selesai</div>
-            <div className="stat-val">
-              <NumberTicker value={dash.total_documents_checked} />
+        {isAi ? (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Dianalisis Pola AI</CardDescription>
+                  <CardTitle className="font-serif text-3xl tabular-nums">
+                    <NumberTicker value={dash.ai_stats?.total_ai_analyzed ?? 0} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">
+                  Gabungan mode Deteksi AI &amp; Laporan Gabungan.
+                </CardContent>
+              </Card>
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription>Rata-rata Indikasi Pola AI</CardDescription>
+                  <CardTitle className="font-serif text-3xl tabular-nums">
+                    {dash.average_ai_likelihood !== null ? `${dash.average_ai_likelihood.toFixed(1)}%` : "-"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">
+                  Estimasi probabilistik berbasis stilometri &amp; entropi.
+                </CardContent>
+              </Card>
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription>Mode Gabungan Selesai</CardDescription>
+                  <CardTitle className="font-serif text-3xl tabular-nums">
+                    <NumberTicker value={dash.ai_stats?.total_combined ?? 0} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">
+                  Menghasilkan laporan plagiasi dan laporan AI terpisah.
+                </CardContent>
+              </Card>
             </div>
-            <div className="stat-sub">
-              Rata-rata skor: {dash.average_similarity !== null ? `${dash.average_similarity.toFixed(2)}%` : "-"}
-            </div>
-          </div>
-          <div className="card">
-            <div className="stat-label">Dokumen Korpus / Full-Text</div>
-            <div className="stat-val">
-              <NumberTicker value={dash.corpus_stats.total_documents} />
-            </div>
-            <div className="stat-sub">Full-text siap: {dash.corpus_stats.fulltext_sources_available}</div>
-          </div>
-          <div className="card">
-            <div className="stat-label">Total Sidik Jari (Winnowing)</div>
-            <div className="stat-val">
-              <NumberTicker value={dash.corpus_stats.total_fingerprints} />
-            </div>
-            <div className="stat-sub">{dash.corpus_stats.total_words.toLocaleString("id-ID")} kata terindeks</div>
-          </div>
-          <div className="card">
-            <div className="stat-label">Kueri / Akuisisi Eksternal</div>
-            <div className="stat-val">
-              <NumberTicker value={dash.provider_stats.total_queries} />
-            </div>
-            <div className="stat-sub">{dash.provider_stats.total_acquisitions} kandidat sumber tercatat</div>
-          </div>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
-          <div className="card">
-            <h3 className="section-title">Tren Similarity Index Terbaru (%)</h3>
-            {dash.trend.length === 0 ? (
-              <div className="empty-state" style={{ padding: "24px 16px" }}>
-                <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>Belum ada data pemeriksaan untuk ditampilkan.</div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={dash.trend} margin={{ top: 10, right: 16, left: -12, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--text-secondary)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "var(--text-muted)" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                  <Tooltip />
-                  <Bar dataKey="similarity_index" name="Similarity Index (%)" fill="#1E3A5F" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          <div className="card">
-            <h3 className="section-title">Performa Provider Sumber</h3>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Provider</th>
-                    <th className="num">Kueri</th>
-                    <th className="num">Hasil</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {providers.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <strong>{p.name}</strong>
-                      </td>
-                      <td className="num">{p.request_count}</td>
-                      <td className="num">{p.result_count}</td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            !p.configured
-                              ? "badge-neutral"
-                              : p.health === "healthy"
-                              ? "badge-SUCCESS"
-                              : p.health === "degraded"
-                              ? "badge-EXACT"
-                              : "badge-SEMANTIC"
-                          }`}
-                        >
-                          {!p.configured ? "NOT_CONFIGURED" : p.health}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="size-4 text-primary" />
+                  <span>Distribusi Klasifikasi Deteksi AI</span>
+                </CardTitle>
+                <CardDescription>Jumlah dokumen per kategori interpretasi konservatif.</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={classChart} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} />
+                    <RechartsTooltip />
+                    <Bar dataKey="jumlah" name="Jumlah Dokumen" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={44} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Naskah Selesai</CardDescription>
+                  <CardTitle className="font-serif text-3xl tabular-nums">
+                    <NumberTicker value={dash.total_documents_checked} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">Seluruh dokumen terproses.</CardContent>
+              </Card>
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription>Rata-rata Indeks Kemiripan</CardDescription>
+                  <CardTitle className="font-serif text-3xl tabular-nums">
+                    {dash.average_similarity !== null ? `${dash.average_similarity.toFixed(1)}%` : "-"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">Hanya dari mode Plagiasi &amp; Gabungan.</CardContent>
+              </Card>
+              <Card className="shadow-none">
+                <CardHeader className="pb-2">
+                  <CardDescription>Total Kata di Korpus Lokal</CardDescription>
+                  <CardTitle className="font-serif text-3xl tabular-nums">
+                    <NumberTicker value={dash.corpus_stats.total_words} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 text-xs text-muted-foreground">
+                  {dash.corpus_stats.fulltext_sources_available} sumber teks penuh tersedia.
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </div>
 
-        {dash.recent_reports.length > 0 && (
-          <div className="card" style={{ marginTop: 16 }}>
-            <h3 className="section-title">Laporan Terakhir</h3>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Laporan</th>
-                    <th>Berkas</th>
-                    <th className="num">Kata Cocok / Eligible</th>
-                    <th className="num">Similarity Index</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dash.recent_reports.map((r) => (
-                    <tr key={r.check_id}>
-                      <td>
-                        <Link to={`/reports/${r.check_id}`}>
-                          <strong>{r.report_number}</strong>
-                        </Link>
-                      </td>
-                      <td>{r.filename}</td>
-                      <td className="num">
-                        {r.matched_words} / {r.eligible_words}
-                      </td>
-                      <td className="num">
-                        <strong>{r.similarity_index.toFixed(2)}%</strong>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            <Card className="shadow-none">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BarChart3 className="size-4 text-primary" />
+                  <span>Tren Indeks Kemiripan Terbaru</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dash.trend} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+                    <XAxis dataKey="report_number" tick={{ fontSize: 11, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} />
+                    <RechartsTooltip />
+                    <Bar dataKey="similarity_index" name="Indeks Kemiripan (%)" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={42} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </BlurFade>

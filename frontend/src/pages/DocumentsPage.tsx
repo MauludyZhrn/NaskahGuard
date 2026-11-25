@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Trash2, Download, FolderOpen } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Download, FolderOpen, Search, Trash2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,28 +11,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiFetch, downloadProtectedFile } from "../api/client";
+import { PageHeader } from "../components/PageHeader";
 import { DocumentItem } from "../types";
 
 export const DocumentsPage: React.FC = () => {
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [docs, setDocs] = useState<DocumentItem[] | null>(null);
+  const [search, setSearch] = useState("");
   const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadDocs = () => {
-    setLoading(true);
+  const load = () => {
     apiFetch<DocumentItem[]>("/documents?role=SUBMISSION")
       .then(setDocs)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((err: Error) => setError(err.message));
   };
 
   useEffect(() => {
-    loadDocs();
+    load();
   }, []);
 
   const confirmDelete = async () => {
@@ -40,108 +43,128 @@ export const DocumentsPage: React.FC = () => {
     try {
       await apiFetch(`/documents/${pendingDelete.id}`, { method: "DELETE" });
       setPendingDelete(null);
-      loadDocs();
-    } catch (e: any) {
-      setError(e.message);
+      load();
+    } catch (err: any) {
+      setError(err.message);
       setPendingDelete(null);
     }
   };
 
+  const filtered = (docs || []).filter((d) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return `${d.title || ""} ${d.filename}`.toLowerCase().includes(q);
+  });
+
   return (
-    <BlurFade duration={0.22}>
-      <div>
-        <div className="page-header">
-          <div>
-            <h2 className="page-title">Pustaka Dokumen</h2>
-            <p className="page-desc">
-              Kelola dokumen naskah yang pernah diunggah. Penghapusan akan membersihkan seluruh data turunan secara permanen.
-            </p>
-          </div>
-        </div>
+    <BlurFade duration={0.2}>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Pustaka Dokumen"
+          description="Daftar seluruh naskah yang pernah diunggah untuk diperiksa kemiripan maupun pola tulisan AI."
+        />
 
         {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Terjadi kesalahan</AlertTitle>
+          <Alert variant="destructive">
+            <AlertTitle>Terjadi kendala</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {loading ? (
-          <div className="card">
-            <Skeleton className="h-6 w-48 mb-3" />
-            <Skeleton className="h-28 w-full" />
-          </div>
-        ) : docs.length === 0 ? (
-          <div className="empty-state">
-            <FolderOpen size={26} color="var(--text-muted)" />
-            <div style={{ fontWeight: 600 }}>Belum ada dokumen naskah</div>
-            <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-              Unggah naskah PDF, DOCX, atau TXT melalui menu <Link to="/new-check">Pemeriksaan Baru</Link>.
-            </div>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nama Berkas</th>
-                  <th>Tipe</th>
-                  <th>Bahasa</th>
-                  <th className="num">Halaman</th>
-                  <th className="num">Kata</th>
-                  <th>Ekstraksi</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {docs.map((d) => (
-                  <tr key={d.id}>
-                    <td>
-                      <strong>{d.filename}</strong>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                        {new Date(d.created_at).toLocaleString("id-ID")}
-                      </div>
-                    </td>
-                    <td>{d.file_type.toUpperCase()}</td>
-                    <td>{d.language}</td>
-                    <td className="num">{d.page_count}</td>
-                    <td className="num">{d.word_count.toLocaleString("id-ID")}</td>
-                    <td>
-                      {d.extraction_method} ({Math.round(d.extraction_confidence * 100)}%)
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => downloadProtectedFile(`/documents/${d.id}/file`, d.filename)}
-                        >
-                          <Download size={14} /> Unduh
-                        </button>
-                        <button type="button" className="btn btn-danger" onClick={() => setPendingDelete(d)}>
-                          <Trash2 size={14} /> Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari judul atau nama berkas..."
+            className="pl-9"
+            aria-label="Cari dokumen"
+          />
+        </div>
 
-        <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <Card className="shadow-none">
+          <CardContent className="p-0">
+            {!docs ? (
+              <div className="flex flex-col gap-3 p-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
+                <FolderOpen className="size-8 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm font-medium text-foreground">Belum ada naskah di pustaka</p>
+                <p className="text-xs text-muted-foreground">Unggah naskah melalui menu Pemeriksaan Baru.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Judul &amp; Nama Berkas</TableHead>
+                      <TableHead>Format</TableHead>
+                      <TableHead className="text-right">Halaman</TableHead>
+                      <TableHead className="text-right">Kata</TableHead>
+                      <TableHead>Diunggah</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="max-w-[320px]">
+                          <div className="truncate font-medium text-foreground">{d.title || d.filename}</div>
+                          <div className="truncate text-xs text-muted-foreground">{d.filename}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{d.file_type.toUpperCase()}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{d.page_count}</TableCell>
+                        <TableCell className="text-right tabular-nums">{d.word_count.toLocaleString("id-ID")}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(d.created_at).toLocaleDateString("id-ID")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => downloadProtectedFile(`/documents/${d.id}/file`, d.filename)}
+                              aria-label={`Unduh ${d.filename}`}
+                            >
+                              <Download className="size-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPendingDelete(d)}
+                              aria-label={`Hapus ${d.filename}`}
+                            >
+                              <Trash2 className="size-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Hapus Dokumen Secara Permanen?</AlertDialogTitle>
+              <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
               <AlertDialogDescription>
-                Dokumen <strong>{pendingDelete?.filename}</strong> beserta berkas asli, segmen ekstraksi, dan laporan
-                kemiripan terkait akan dihapus dari penyimpanan lokal.
+                Menghapus <strong>{pendingDelete?.filename}</strong> juga menghapus riwayat pemeriksaan terkait berkas ini.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Batal</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete}>Ya, Hapus Permanen</AlertDialogAction>
+              <AlertDialogAction onClick={confirmDelete}>Hapus</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
