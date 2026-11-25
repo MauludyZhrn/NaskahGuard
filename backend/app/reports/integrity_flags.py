@@ -69,7 +69,7 @@ def extract_active_filters(settings: dict[str, Any] | None) -> list[str]:
     if not isinstance(settings, dict):
         return []
     mapping = [
-        ("exclude_bibliography", "Daftar Pustaka"),
+        ("exclude_bibliography", "Daftar Pustaka / Bibliography"),
         ("exclude_citations", "Sitasi Dalam Teks"),
         ("exclude_quotes", "Kutipan Langsung"),
         ("exclude_toc", "Daftar Isi"),

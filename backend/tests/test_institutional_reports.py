@@ -88,7 +88,7 @@ def test_source_palette_categories_and_filters():
     assert summary["counts"] == {"internet": 1, "publication": 1, "local": 1}
 
     filters = extract_active_filters({"exclude_bibliography": True, "exclude_quotes": True, "exclude_citations": False})
-    assert filters == ["Daftar Pustaka", "Kutipan Langsung"]
+    assert filters == ["Daftar Pustaka / Bibliography", "Kutipan Langsung"]
 
 
 def test_e2e_institutional_pdf_and_html_report_for_pdf_and_txt(isolated_env):
@@ -142,7 +142,7 @@ def test_e2e_institutional_pdf_and_html_report_for_pdf_and_txt(isolated_env):
         rep_res = client.get(f"/api/checks/{check_id}/report")
         assert rep_res.status_code == 200
         rep = rep_res.json()
-        assert "Daftar Pustaka" in rep["active_filters"]
+        assert "Daftar Pustaka / Bibliography" in rep["active_filters"]
         assert "Kutipan Langsung" in rep["active_filters"]
         assert rep["source_categories"]["counts"]["local"] >= 1
         assert len(rep["sources"]) >= 1

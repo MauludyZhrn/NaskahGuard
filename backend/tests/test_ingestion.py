@@ -61,3 +61,33 @@ def test_docx_and_txt_extraction(tmp_path: Path):
     txt_path.write_text("Paragraf pertama tentang kecerdasan buatan.\n\nParagraf kedua tentang evaluasi.", encoding="utf-8")
     ext_txt = extract_txt(txt_path)
     assert "kecerdasan buatan" in ext_txt.text
+
+
+def test_bibliography_heading_variants_excluded():
+    from app.engine.exclusions import build_exclusion_mask
+    from app.schemas import CheckSettingsSchema
+
+    variants = [
+        "Bibliography",
+        "6. Bibliography",
+        "Bibliografi",
+        "Works Cited",
+        "BAB V. DAFTAR PUSTAKA",
+        "Selected Bibliography (Primary Sources)",
+        "Bibliography: Al-Syafi'i, Kitab Al-Umm.",
+    ]
+    for heading in variants:
+        text = (
+            "Pendahuluan membahas metode hisab awal waktu salat Idain.\n\n"
+            f"{heading}\n\n"
+            "Al-Syafi'i, Muhammad bin Idris. Al-Umm. Beirut: Dar al-Fikr."
+        )
+        pages = [type("P", (), {"number": 1, "char_start": 0, "char_end": len(text)})()]
+        tokens = tokenize_with_offsets(text)
+        segs = segment_document(text, pages, tokens)
+        annotate_structure(text, pages, segs)
+        zones = [s.zone for s in segs]
+        assert zones[0] == "BODY", f"Body misclassified for {heading}"
+        assert zones[-1] == "BIBLIOGRAPHY", f"Bibliography not detected for heading: {heading!r}"
+        mask = build_exclusion_mask(text, [[t.norm, t.char_start, t.char_end] for t in tokens], segs, CheckSettingsSchema(exclude_bibliography=True))
+        assert mask[-1] == "BIBLIOGRAPHY", f"Exclusion mask missing BIBLIOGRAPHY for {heading!r}"

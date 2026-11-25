@@ -380,16 +380,25 @@ export const NewCheckPage: React.FC = () => {
                       Bagian yang Dikecualikan dari Skor
                     </p>
                     {[
-                      { key: "exclude_bibliography", label: "Kecualikan Daftar Pustaka" },
+                      {
+                        key: "exclude_bibliography",
+                        label: "Kecualikan Daftar Pustaka / Bibliography",
+                        hint: "Daftar Pustaka, Bibliography, Bibliografi, References, Works Cited",
+                      },
                       { key: "exclude_citations", label: "Kecualikan Sitasi Dalam Teks" },
                       { key: "exclude_quotes", label: "Kecualikan Kutipan Langsung" },
                       { key: "exclude_toc", label: "Kecualikan Daftar Isi" },
                       { key: "exclude_common_phrases", label: "Kecualikan Frasa Akademik Umum" },
                     ].map((opt) => (
                       <div key={opt.key} className="flex items-center justify-between gap-3">
-                        <Label htmlFor={opt.key} className="font-normal text-foreground cursor-pointer">
-                          {opt.label}
-                        </Label>
+                        <div className="flex flex-col gap-0.5">
+                          <Label htmlFor={opt.key} className="font-normal text-foreground cursor-pointer">
+                            {opt.label}
+                          </Label>
+                          {"hint" in opt && opt.hint ? (
+                            <span className="text-[11px] text-muted-foreground">{opt.hint}</span>
+                          ) : null}
+                        </div>
                         <Switch
                           id={opt.key}
                           checked={Boolean((settings as any)[opt.key])}

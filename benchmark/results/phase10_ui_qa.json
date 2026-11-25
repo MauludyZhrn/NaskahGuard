@@ -78,7 +78,7 @@
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/reports/248fe3db-bc18-4433-b6d0-eb5a1ccf66d1",
+      "route": "/reports/44408f7f-70d2-4cbe-a16d-ff6dd557def5",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true

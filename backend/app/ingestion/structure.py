@@ -7,8 +7,34 @@ import re
 from app.ingestion.pdf import PageSpan
 from app.ingestion.segment import SegmentSpan
 
+_BIB_PREFIX = (
+    r"(?:(?:BAB\s+[IVXLC\d]+(?:\s*[:.\-–—]\s*|\s+)"
+    r"|CHAPTER\s+\d+(?:\s*[:.\-–—]\s*|\s+)"
+    r"|[IVXLC]{1,5}\.\s+"
+    r"|[A-Z]\.\s+"
+    r"|\d+(?:\.\d+)*\.?\s+))?"
+)
+_BIB_CORE = (
+    r"(?:daftar\s+pustaka(?:\s*/\s*bibliography)?"
+    r"|daftar\s+(?:rujukan|referensi|bacaan|sumber)"
+    r"|pustaka\s+acuan"
+    r"|referensi"
+    r"|kepustakaan"
+    r"|bibliografi"
+    r"|(?:selected\s+|annotated\s+)?bibliography"
+    r"|(?:list\s+of\s+)?references"
+    r"|works\s+cited"
+    r"|literature\s+cited"
+    r"|sources\s+cited"
+    r"|sumber\s+(?:rujukan|pustaka|bacaan)"
+    r"|mar[aā]ji['’]?)"
+)
 _BIB_HEADING_RE = re.compile(
-    r"^(daftar\s+pustaka|daftar\s+rujukan|referensi|kepustakaan|bibliography|references)\s*:?\s*$",
+    rf"^{_BIB_PREFIX}{_BIB_CORE}(?:\s*\([^)]{{1,40}}\))?(?:\s*[:.\-–—]|\s+\d{{1,4}})?\s*$",
+    re.IGNORECASE,
+)
+_BIB_INLINE_PREFIX_RE = re.compile(
+    rf"^{_BIB_PREFIX}(?:bibliography|bibliografi|daftar\s+pustaka|references|works\s+cited)\s*:\s+\S",
     re.IGNORECASE,
 )
 _APPENDIX_HEADING_RE = re.compile(r"^(lampiran|appendix)\b", re.IGNORECASE)
@@ -84,9 +110,9 @@ def annotate_structure(
         first_line = lines[0] if lines else ""
 
         # Check heading transitions
-        if any(_BIB_HEADING_RE.match(ln) for ln in lines):
+        if any(_BIB_HEADING_RE.match(ln) or _BIB_INLINE_PREFIX_RE.match(ln) for ln in lines):
             in_bibliography = True
-            current_section = "Daftar Pustaka"
+            current_section = "Daftar Pustaka / Bibliography"
         elif in_bibliography and any(_APPENDIX_HEADING_RE.match(ln) for ln in lines):
             in_bibliography = False
             current_section = "Lampiran"

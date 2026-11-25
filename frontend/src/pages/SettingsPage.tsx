@@ -120,14 +120,23 @@ export const SettingsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {[
-                { key: "exclude_bibliography", label: "Kecualikan Daftar Pustaka" },
+                {
+                  key: "exclude_bibliography",
+                  label: "Kecualikan Daftar Pustaka / Bibliography",
+                  hint: "Daftar Pustaka, Bibliography, Bibliografi, References, Works Cited",
+                },
                 { key: "exclude_citations", label: "Kecualikan Sitasi Dalam Teks" },
                 { key: "exclude_quotes", label: "Kecualikan Kutipan Langsung" },
                 { key: "exclude_toc", label: "Kecualikan Daftar Isi" },
                 { key: "exclude_common_phrases", label: "Kecualikan Frasa Akademik Umum" },
               ].map((item) => (
                 <div key={item.key} className="flex items-center justify-between gap-3">
-                  <Label htmlFor={`set-${item.key}`} className="font-normal cursor-pointer">{item.label}</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor={`set-${item.key}`} className="font-normal cursor-pointer">{item.label}</Label>
+                    {"hint" in item && item.hint ? (
+                      <span className="text-[11px] text-muted-foreground">{item.hint}</span>
+                    ) : null}
+                  </div>
                   <Switch
                     id={`set-${item.key}`}
                     checked={Boolean((ex as any)[item.key])}
