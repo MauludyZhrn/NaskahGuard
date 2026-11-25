@@ -271,7 +271,7 @@
     ]
   },
   "latency": {
-    "total_ms": 84.38,
-    "avg_ms_per_doc": 1.17
+    "total_ms": 83.78,
+    "avg_ms_per_doc": 1.16
   }
 }
