@@ -6,6 +6,7 @@ backend/data/*.db
 *.db-journal
 *.db-wal
 *.db-shm
+*.log
 
 # Python
 .venv/
@@ -21,11 +22,15 @@ node_modules/
 frontend/node_modules/
 frontend/dist/
 .vite/
+*.tsbuildinfo
 
 # Environment & Secrets
 .env
 backend/.env
 frontend/.env.local
+
+# Raw Brand Kit Archive (app assets already live in frontend/public/brand/)
+assets/
 
 # Research clones
 research/vendor/
