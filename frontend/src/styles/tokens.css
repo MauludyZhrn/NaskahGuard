@@ -1,78 +1,85 @@
-/* NaskahGuard Design Tokens — Phase 9 Unified Tokens (ui-ux-pro-max + shadcn/ui) */
+/* NaskahGuard Design Tokens — Ivory Burgundy Editorial Palette (60 / 30 / 10)
+ * Reference: Latar #F8F5F0 · Permukaan #EDE6DD · Teks #1B1416 · Aksen #6E1F2F · Redup #9A8F89
+ */
 
 :root {
-  /* Brand & Semantic Palette (Light Mode) */
-  --color-primary: #1e3a5f;
-  --color-primary-hover: #162d4b;
-  --color-on-primary: #ffffff;
-  --color-primary-soft: #e8eff8;
-  --color-primary-text: #1e3a5f;
+  /* 10% Brand Accent — Editorial Burgundy */
+  --color-primary: #6e1f2f;
+  --color-primary-hover: #561623;
+  --color-on-primary: #faf7f3;
+  --color-primary-soft: rgba(110, 31, 47, 0.09);
+  --color-primary-text: #6e1f2f;
 
-  /* Direct aliases used across pages */
   --primary: var(--color-primary);
   --primary-soft: var(--color-primary-soft);
-  --secondary: #334155;
-  --accent: #b45309;
+  --secondary: #ede6dd;
+  --accent: #9a8f89;
 
-  --color-secondary: #334155;
-  --color-accent: #b45309;
-  --color-accent-soft: #fef3c7;
+  /* 60% Canvas & 30% Surfaces */
+  --bg: #f8f5f0;
+  --surface: #fffdfb;
+  --surface-alt: #ede6dd;
+  --surface-elevated: #fffdfb;
+  --border: #e0d7cb;
+  --border-strong: #cec2b3;
 
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --surface-alt: #f1f5f9;
-  --surface-elevated: #ffffff;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  /* Ink & Hierarchy (WCAG AA >= 4.5:1) */
+  --text: #1b1416;
+  --text-secondary: #5e544f;
+  --text-muted: #786d67;
+  --taupe: #9a8f89;
 
-  --text: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
+  /* HSL mappings for shadcn/ui & Radix primitives (Light Mode) */
+  --tw-background: 38 36% 96%;
+  --tw-foreground: 343 15% 9%;
+  --tw-card: 30 100% 99%;
+  --tw-card-foreground: 343 15% 9%;
+  --tw-popover: 30 100% 99%;
+  --tw-popover-foreground: 343 15% 9%;
+  --tw-primary: 348 56% 28%;
+  --tw-primary-foreground: 36 42% 97%;
+  --tw-secondary: 34 31% 90%;
+  --tw-secondary-foreground: 343 15% 15%;
+  --tw-muted: 34 28% 91%;
+  --tw-muted-foreground: 20 9% 38%;
+  --tw-accent: 34 29% 88%;
+  --tw-accent-foreground: 343 15% 9%;
+  --tw-destructive: 354 72% 43%;
+  --tw-destructive-foreground: 36 42% 98%;
+  --tw-border: 34 24% 84%;
+  --tw-input: 32 22% 78%;
+  --tw-ring: 348 56% 28%;
 
-  /* HSL mappings for shadcn/ui & Radix primitives */
-  --tw-background: 210 40% 98%;
-  --tw-foreground: 222 47% 11%;
-  --tw-card: 0 0% 100%;
-  --tw-card-foreground: 222 47% 11%;
-  --tw-popover: 0 0% 100%;
-  --tw-popover-foreground: 222 47% 11%;
-  --tw-primary: 214 52% 25%;
-  --tw-primary-foreground: 0 0% 100%;
-  --tw-secondary: 210 40% 96%;
-  --tw-secondary-foreground: 215 25% 27%;
-  --tw-muted: 210 40% 96%;
-  --tw-muted-foreground: 215 16% 47%;
-  --tw-accent: 210 40% 94%;
-  --tw-accent-foreground: 222 47% 11%;
-  --tw-destructive: 0 72% 51%;
-  --tw-destructive-foreground: 0 0% 100%;
-  --tw-border: 214 32% 91%;
-  --tw-input: 214 32% 86%;
-  --tw-ring: 214 52% 25%;
+  /* Tufte Data-Viz Palette (Gray-first + Burgundy Highlight) */
+  --chart-muted: #9a8f89;
+  --chart-primary: #6e1f2f;
+  --chart-secondary: #b46535;
+  --chart-axis: #cec2b3;
+  --chart-ref: #9a8f89;
 
   /* Match Category Semantic Colors */
-  --exact-bg: rgba(220, 38, 38, 0.14);
-  --exact-border: #dc2626;
-  --exact-text: #991b1b;
+  --exact-bg: rgba(185, 28, 44, 0.13);
+  --exact-border: #b91c2c;
+  --exact-text: #881320;
 
-  --near-bg: rgba(234, 88, 12, 0.15);
-  --near-border: #ea580c;
-  --near-text: #9a3412;
+  --near-bg: rgba(180, 83, 9, 0.13);
+  --near-border: #b45309;
+  --near-text: #92400e;
 
-  --lexical-bg: rgba(202, 138, 4, 0.16);
-  --lexical-border: #ca8a04;
-  --lexical-text: #854d0e;
+  --lexical-bg: rgba(161, 98, 7, 0.14);
+  --lexical-border: #a16207;
+  --lexical-text: #713f12;
 
-  --semantic-bg: rgba(30, 58, 95, 0.12);
-  --semantic-border: #2563eb;
-  --semantic-text: #1e40af;
+  --semantic-bg: rgba(110, 31, 47, 0.11);
+  --semantic-border: #6e1f2f;
+  --semantic-text: #6e1f2f;
 
-  --excluded-bg: rgba(100, 116, 139, 0.14);
-  --excluded-border: #64748b;
-  --excluded-text: #334155;
+  --excluded-bg: rgba(154, 143, 137, 0.18);
+  --excluded-border: #9a8f89;
+  --excluded-text: #5e544f;
 
-  --success-bg: rgba(22, 163, 74, 0.12);
-  --success-border: rgba(22, 163, 74, 0.35);
+  --success-bg: rgba(21, 128, 61, 0.11);
+  --success-border: rgba(21, 128, 61, 0.34);
   --success-text: #166534;
 
   /* Spacing & Radii */
@@ -86,94 +93,98 @@
   --radius-md: 10px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 10px 28px rgba(15, 23, 42, 0.14);
+  --shadow-sm: 0 1px 2px rgba(27, 20, 22, 0.04);
+  --shadow-md: 0 4px 12px rgba(27, 20, 22, 0.06);
+  --shadow-lg: 0 10px 28px rgba(27, 20, 22, 0.10);
 
-  /* Typography */
-  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-doc: Georgia, "Palatino Linotype", Palatino, serif;
+  /* Editorial Typography */
+  --font-ui: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-doc: "Newsreader", Georgia, "Palatino Linotype", Palatino, serif;
   --font-serif: var(--font-doc);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Sidebar widths */
   --sidebar-expanded: 260px;
-  --sidebar-collapsed: 72px;
+  --sidebar-collapsed: 70px;
 }
 
 [data-theme="dark"] {
-  --color-primary: #60a5fa;
-  --color-primary-hover: #93c5fd;
-  --color-on-primary: #0f172a;
-  --color-primary-soft: rgba(96, 165, 250, 0.16);
-  --color-primary-text: #93c5fd;
+  /* Dark Mode Editorial Counterpart — Deep Espresso & Rose-Burgundy */
+  --color-primary: #b23a52;
+  --color-primary-hover: #c94c65;
+  --color-on-primary: #faf7f3;
+  --color-primary-soft: rgba(210, 107, 126, 0.16);
+  --color-primary-text: #e38c9c;
 
   --primary: var(--color-primary);
   --primary-soft: var(--color-primary-soft);
-  --secondary: #94a3b8;
-  --accent: #f59e0b;
+  --secondary: #2a2125;
+  --accent: #b8aca6;
 
-  --color-secondary: #94a3b8;
-  --color-accent: #f59e0b;
-  --color-accent-soft: rgba(245, 158, 11, 0.16);
+  --bg: #141012;
+  --surface: #1d171a;
+  --surface-alt: #282024;
+  --surface-elevated: #231c1f;
+  --border: #3a2e33;
+  --border-strong: #4e3f45;
 
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-alt: #263348;
-  --surface-elevated: #273449;
-  --border: #334155;
-  --border-strong: #475569;
+  --text: #f5efe8;
+  --text-secondary: #cdc2bc;
+  --text-muted: #b0a49e;
+  --taupe: #9a8f89;
 
-  --text: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-
-  /* HSL mappings for shadcn/ui & Radix primitives (Dark Mode) */
-  --tw-background: 222 47% 11%;
-  --tw-foreground: 210 40% 96%;
-  --tw-card: 217 33% 17%;
-  --tw-card-foreground: 210 40% 96%;
-  --tw-popover: 217 33% 17%;
-  --tw-popover-foreground: 210 40% 96%;
-  --tw-primary: 213 94% 68%;
-  --tw-primary-foreground: 222 47% 11%;
-  --tw-secondary: 217 33% 22%;
-  --tw-secondary-foreground: 210 40% 96%;
-  --tw-muted: 217 33% 22%;
-  --tw-muted-foreground: 215 20% 65%;
-  --tw-accent: 217 33% 24%;
-  --tw-accent-foreground: 210 40% 96%;
-  --tw-destructive: 0 63% 55%;
+  /* HSL mappings for shadcn/ui & Radix primitives (Dark Mode — Verified WCAG AA) */
+  --tw-background: 330 11% 7%;
+  --tw-foreground: 32 40% 94%;
+  --tw-card: 330 11% 10%;
+  --tw-card-foreground: 32 40% 94%;
+  --tw-popover: 330 11% 11%;
+  --tw-popover-foreground: 32 40% 94%;
+  --tw-primary: 348 51% 46%;
+  --tw-primary-foreground: 36 42% 97%;
+  --tw-secondary: 333 12% 15%;
+  --tw-secondary-foreground: 32 32% 92%;
+  --tw-muted: 333 11% 15%;
+  --tw-muted-foreground: 20 12% 71%;
+  --tw-accent: 332 13% 18%;
+  --tw-accent-foreground: 32 40% 95%;
+  --tw-destructive: 354 70% 56%;
   --tw-destructive-foreground: 0 0% 100%;
-  --tw-border: 215 25% 27%;
-  --tw-input: 215 25% 32%;
-  --tw-ring: 213 94% 68%;
+  --tw-border: 335 12% 21%;
+  --tw-input: 335 11% 27%;
+  --tw-ring: 348 60% 62%;
 
-  --exact-bg: rgba(239, 68, 68, 0.24);
-  --exact-border: #f87171;
-  --exact-text: #fecaca;
+  /* Tufte Data-Viz Palette (Dark Mode) */
+  --chart-muted: #8f837d;
+  --chart-primary: #d96b80;
+  --chart-secondary: #df9a63;
+  --chart-axis: #4e3f45;
+  --chart-ref: #8f837d;
 
-  --near-bg: rgba(249, 115, 22, 0.24);
-  --near-border: #fb923c;
-  --near-text: #fed7aa;
+  --exact-bg: rgba(225, 68, 86, 0.22);
+  --exact-border: #f06d7d;
+  --exact-text: #fecdd3;
 
-  --lexical-bg: rgba(234, 179, 8, 0.22);
-  --lexical-border: #facc15;
+  --near-bg: rgba(217, 119, 6, 0.24);
+  --near-border: #f59e0b;
+  --near-text: #fde68a;
+
+  --lexical-bg: rgba(202, 138, 4, 0.22);
+  --lexical-border: #eab308;
   --lexical-text: #fef08a;
 
-  --semantic-bg: rgba(96, 165, 250, 0.22);
-  --semantic-border: #60a5fa;
-  --semantic-text: #bfdbfe;
+  --semantic-bg: rgba(217, 107, 128, 0.20);
+  --semantic-border: #d96b80;
+  --semantic-text: #f7cad3;
 
-  --excluded-bg: rgba(148, 163, 184, 0.2);
-  --excluded-border: #94a3b8;
-  --excluded-text: #cbd5e1;
+  --excluded-bg: rgba(154, 143, 137, 0.20);
+  --excluded-border: #9a8f89;
+  --excluded-text: #cdc2bc;
 
-  --success-bg: rgba(34, 197, 94, 0.18);
-  --success-border: rgba(34, 197, 94, 0.4);
+  --success-bg: rgba(34, 197, 94, 0.16);
+  --success-border: rgba(74, 222, 128, 0.35);
   --success-text: #86efac;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.36);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.50);
 }

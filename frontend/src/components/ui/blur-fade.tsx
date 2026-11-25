@@ -1,87 +1,41 @@
-import { useRef } from "react"
-import {
-  AnimatePresence,
-  motion,
-  useInView,
-  useReducedMotion,
-  type MotionProps,
-  type UseInViewOptions,
-  type Variants,
-} from "motion/react"
+import React from "react"
+import { cn } from "@/lib/utils"
 
-type MarginType = UseInViewOptions["margin"]
-
-interface BlurFadeProps extends MotionProps {
+interface BlurFadeProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
   className?: string
-  variant?: {
-    hidden: { y: number }
-    visible: { y: number }
-  }
   duration?: number
   delay?: number
   offset?: number
   direction?: "up" | "down" | "left" | "right"
   inView?: boolean
-  inViewMargin?: MarginType
   blur?: string
 }
 
+/**
+ * Lightweight Magic UI–style fade-in entrance using pure CSS keyframes.
+ * Never gets stuck at opacity: 0 across React StrictMode mounts or font loads,
+ * and automatically collapses to instant reveal under prefers-reduced-motion.
+ */
 export function BlurFade({
   children,
   className,
-  variant,
-  duration = 0.26,
+  duration = 0.22,
   delay = 0,
-  offset = 5,
-  direction = "up",
-  inView = false,
-  inViewMargin = "-40px",
-  blur = "4px",
+  style,
   ...props
 }: BlurFadeProps) {
-  const ref = useRef(null)
-  const prefersReduced = useReducedMotion()
-  const inViewResult = useInView(ref, { once: true, margin: inViewMargin })
-  const isInView = !inView || inViewResult
-
-  if (prefersReduced) {
-    return <div className={className}>{children}</div>
-  }
-
-  const defaultVariants: Variants = {
-    hidden: {
-      [direction === "left" || direction === "right" ? "x" : "y"]:
-        direction === "right" || direction === "down" ? -offset : offset,
-      opacity: 0,
-      filter: `blur(${blur})`,
-    },
-    visible: {
-      [direction === "left" || direction === "right" ? "x" : "y"]: 0,
-      opacity: 1,
-      filter: "blur(0px)",
-    },
-  }
-  const combinedVariants = variant ?? defaultVariants
-
   return (
-    <AnimatePresence>
-      <motion.div
-        ref={ref}
-        initial="hidden"
-        animate={isInView ? "visible" : "hidden"}
-        exit="hidden"
-        variants={combinedVariants}
-        transition={{
-          delay: 0.02 + delay,
-          duration,
-          ease: "easeOut",
-        }}
-        className={className}
-        {...props}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div
+      className={cn("ng-fade-in", className)}
+      style={{
+        animationDuration: `${duration}s`,
+        animationDelay: `${delay}s`,
+        ...style,
+      }}
+      {...props}
+    >
+      {children}
+    </div>
   )
 }

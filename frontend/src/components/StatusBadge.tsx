@@ -6,14 +6,14 @@ export function ModeBadge({ mode }: { mode?: string | null }) {
   const m = mode || "PLAGIARISM_ONLY";
   if (m === "COMBINED") {
     return (
-      <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary font-medium">
+      <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[color:var(--color-primary-text)] font-medium">
         Gabungan
       </Badge>
     );
   }
   if (m === "AI_ONLY") {
     return (
-      <Badge variant="outline" className="border-border bg-accent text-accent-foreground font-medium">
+      <Badge variant="outline" className="border-[color:var(--near-border)]/45 bg-[var(--near-bg)] text-[color:var(--near-text)] font-medium">
         Deteksi AI
       </Badge>
     );
@@ -34,11 +34,11 @@ export function AiClassificationBadge({ classification, label }: { classificatio
     },
     MIXED_UNCERTAIN: {
       text: label || "Campuran / Tidak Pasti",
-      cls: "border-[color:var(--lexical-border)] bg-[var(--lexical-bg)] text-[color:var(--lexical-text)]",
+      cls: "border-[color:var(--lexical-border)]/50 bg-[var(--lexical-bg)] text-[color:var(--lexical-text)]",
     },
     AI_LIKELY: {
       text: label || "Terindikasi Pola AI",
-      cls: "border-destructive/40 bg-destructive/15 text-destructive",
+      cls: "border-[color:var(--exact-border)]/50 bg-[var(--exact-bg)] text-[color:var(--exact-text)]",
     },
     INSUFFICIENT_DATA: {
       text: label || "Tidak Cukup Bukti",
@@ -54,7 +54,7 @@ export function AiClassificationBadge({ classification, label }: { classificatio
 }
 
 export function similarityToneClass(value: number): string {
-  if (value >= 30) return "text-destructive";
-  if (value >= 15) return "text-[color:var(--lexical-text)]";
+  if (value >= 30) return "text-[color:var(--exact-text)]";
+  if (value >= 15) return "text-[color:var(--near-text)]";
   return "text-[color:var(--success-text)]";
 }

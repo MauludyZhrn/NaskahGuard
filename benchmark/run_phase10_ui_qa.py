@@ -244,9 +244,20 @@ def main() -> int:
                     theme_btn.first.click()
                     page.wait_for_timeout(250)
                 page.goto(f"{base_url}/", wait_until="networkidle")
-                page.wait_for_timeout(300)
+                page.wait_for_timeout(850)
                 dark_attr = page.evaluate("document.documentElement.getAttribute('data-theme')")
                 page.screenshot(path=str(SCREENSHOT_DIR / "17_dashboard_dark.png"), full_page=False)
+
+                # Collapse sidebar in dark mode to verify icon rail contrast & zero native scrollbar
+                collapse_btn = page.get_by_label("Ciutkan bilah samping")
+                if collapse_btn.count() > 0:
+                    collapse_btn.first.click()
+                    page.wait_for_timeout(350)
+                page.screenshot(path=str(SCREENSHOT_DIR / "20_dashboard_dark_collapsed.png"), full_page=False)
+                expand_btn = page.get_by_label("Perluas bilah samping")
+                if expand_btn.count() > 0:
+                    expand_btn.first.click()
+                    page.wait_for_timeout(200)
 
                 # Reset to Light Mode & test Tablet (768x1024) + Mobile (390x844)
                 page.evaluate("localStorage.setItem('ng_theme','light'); document.documentElement.setAttribute('data-theme','light');")

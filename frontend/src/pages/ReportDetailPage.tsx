@@ -14,7 +14,7 @@ import {
   Layers,
   ShieldCheck,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -783,14 +783,41 @@ export const ReportDetailPage: React.FC = () => {
                     <CardHeader>
                       <CardTitle className="text-base">Sebaran Kemiripan per Bagian Dokumen</CardTitle>
                     </CardHeader>
-                    <CardContent className="h-[240px]">
+                    <CardContent className="h-[260px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={report.analytics.by_chapter} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                          <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
-                          <XAxis dataKey="chapter" tick={{ fontSize: 11, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} />
-                          <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "var(--text-muted)" }} tickLine={false} axisLine={false} />
-                          <RechartsTooltip content={<ChartTooltip />} />
-                          <Bar dataKey="similarity_pct" name="Kemiripan (%)" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                        <BarChart data={report.analytics.by_chapter} margin={{ top: 24, right: 16, left: -12, bottom: 4 }}>
+                          <XAxis
+                            dataKey="chapter"
+                            tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                            tickLine={false}
+                            axisLine={{ stroke: "var(--chart-axis)", strokeWidth: 0.75 }}
+                            dy={6}
+                          />
+                          <YAxis
+                            domain={[0, 112]}
+                            ticks={[0, 25, 50, 75, 100]}
+                            tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(v) => `${v}%`}
+                          />
+                          <RechartsTooltip content={<ChartTooltip />} cursor={{ fill: "var(--primary-soft)" }} />
+                          <Bar dataKey="similarity_pct" name="Kemiripan (%)" radius={[3, 3, 0, 0]} maxBarSize={36}>
+                            {report.analytics.by_chapter.map((ch, idx) => (
+                              <Cell
+                                key={`ch-${idx}`}
+                                fill={ch.similarity_pct >= 30 ? "var(--chart-primary)" : "var(--chart-muted)"}
+                              />
+                            ))}
+                            <LabelList
+                              dataKey="similarity_pct"
+                              position="top"
+                              fill="var(--text-secondary)"
+                              fontSize={11}
+                              style={{ fontFamily: "var(--font-serif)" }}
+                              formatter={(v: number) => `${v.toFixed(0)}%`}
+                            />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </CardContent>

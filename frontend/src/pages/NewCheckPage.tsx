@@ -200,6 +200,7 @@ export const NewCheckPage: React.FC = () => {
     <BlurFade duration={0.2}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <PageHeader
+          eyebrow="Unggah & Analisis"
           title="Pemeriksaan Baru"
           description="Pilih jenis pemeriksaan, unggah dokumen akademik, lalu sesuaikan opsi seperlunya."
           badge={
@@ -327,7 +328,7 @@ export const NewCheckPage: React.FC = () => {
               </div>
 
               <div className="flex items-end lg:justify-end">
-                <Button type="submit" size="lg" disabled={!file || submitting} className="w-full lg:w-auto">
+                <Button type="submit" size="lg" disabled={!file || submitting} className="w-full rounded-full lg:w-auto">
                   <Play className="size-4" data-icon="inline-start" aria-hidden="true" />
                   <span>
                     {submitting

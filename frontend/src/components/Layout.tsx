@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Activity,
   BarChart3,
@@ -21,7 +21,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  ShieldCheck,
   Sun,
   X,
 } from "lucide-react";
@@ -97,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const Layout: React.FC<LayoutProps> = ({ config }) => {
+  const location = useLocation();
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     localStorage.getItem("ng_theme") === "dark" ? "dark" : "light"
   );
@@ -121,34 +121,41 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
     setClosedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const renderNavLink = (item: NavItem) => {
+  const iconLogo = theme === "dark" ? "/brand/logo-icon-dark.svg" : "/brand/logo-icon-light.svg";
+
+  const isRouteActive = (item: NavItem) => {
+    if (item.end) return location.pathname === item.to;
+    return location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+  };
+
+  const renderNavLink = (item: NavItem, isRailMode: boolean) => {
     const Icon = item.icon;
+    const active = isRouteActive(item);
     const linkEl = (
       <NavLink
-        key={item.to}
+        key={`${isRailMode ? "rail-" : ""}${item.to}`}
         to={item.to}
         end={item.end}
         onClick={() => setMobileOpen(false)}
-        className={({ isActive }) =>
-          cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors cursor-pointer",
-            collapsed && "md:justify-center md:px-2",
-            isActive
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          )
-        }
+        aria-label={isRailMode ? item.label : undefined}
+        className={cn(
+          "flex items-center rounded-lg text-sm font-medium transition-colors cursor-pointer",
+          isRailMode ? "mx-auto size-9 justify-center p-0" : "gap-3 px-3 py-2",
+          active
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-foreground/80 hover:bg-accent hover:text-foreground"
+        )}
       >
         <Icon className="size-4 shrink-0" aria-hidden="true" />
-        <span className={cn("truncate", collapsed && "md:hidden")}>{item.label}</span>
+        {!isRailMode && <span className="truncate">{item.label}</span>}
       </NavLink>
     );
 
-    if (collapsed) {
+    if (isRailMode) {
       return (
-        <Tooltip key={item.to}>
+        <Tooltip key={`tip-${item.to}`}>
           <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
-          <TooltipContent side="right" className="hidden md:block">
+          <TooltipContent side="right" className="font-medium">
             {item.label}
           </TooltipContent>
         </Tooltip>
@@ -158,11 +165,11 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
   };
 
   return (
-    <TooltipProvider delayDuration={180}>
+    <TooltipProvider delayDuration={150}>
       <div className="flex min-h-screen w-full bg-background text-foreground">
         {mobileOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/45 md:hidden"
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] md:hidden"
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
@@ -172,47 +179,48 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
           aria-label="Navigasi utama"
           className={cn(
             "flex-col border-r border-border bg-card transition-all duration-200",
-            collapsed ? "md:w-[70px]" : "md:w-[260px]",
+            collapsed ? "md:w-[68px]" : "md:w-[260px]",
             mobileOpen
-              ? "fixed inset-y-0 left-0 z-50 flex w-[272px]"
+              ? "fixed inset-y-0 left-0 z-50 flex w-[272px] shadow-lg"
               : "hidden md:sticky md:top-0 md:z-30 md:flex md:h-screen"
           )}
         >
-          {/* Brand Header */}
-          <div className="flex h-14 items-center justify-between gap-2 border-b border-border px-3">
-            <div className={cn("flex items-center gap-2.5 min-w-0", collapsed && "md:justify-center md:w-full")}>
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <ShieldCheck className="size-4" aria-hidden="true" />
-              </div>
+          {/* Brand Header using Official NaskahGuard Brand Kit SVGs */}
+          <div
+            className={cn(
+              "flex h-16 shrink-0 items-center border-b border-border",
+              collapsed ? "justify-center px-2 md:flex-col md:gap-1 md:py-2" : "justify-between gap-2 px-4"
+            )}
+          >
+            <div className={cn("flex items-center gap-2.5 min-w-0", collapsed && "md:justify-center")}>
+              <img src={iconLogo} alt={appName} className="size-8 shrink-0 object-contain" />
               <div className={cn("flex flex-col min-w-0", collapsed && "md:hidden")}>
-                <span className="truncate font-serif text-base font-bold leading-tight text-foreground">
+                <span className="truncate font-serif text-lg font-semibold leading-tight tracking-tight text-foreground">
                   {appName}
                 </span>
                 <span className="truncate text-[11px] text-muted-foreground">Integritas Akademik</span>
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="hidden md:inline-flex size-8 shrink-0"
-              onClick={() => setCollapsed((c) => !c)}
-              aria-label={collapsed ? "Perluas bilah samping" : "Ciutkan bilah samping"}
-              title={collapsed ? "Perluas menu" : "Ciutkan menu"}
-            >
-              {collapsed ? (
-                <PanelLeftOpen className="size-4" aria-hidden="true" />
-              ) : (
+            {!collapsed && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="hidden md:inline-flex size-8 shrink-0 text-foreground/75 hover:text-foreground"
+                onClick={() => setCollapsed(true)}
+                aria-label="Ciutkan bilah samping"
+                title="Ciutkan bilah samping"
+              >
                 <PanelLeftClose className="size-4" aria-hidden="true" />
-              )}
-            </Button>
+              </Button>
+            )}
 
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="md:hidden size-8 shrink-0"
+              className="md:hidden size-8 shrink-0 text-foreground"
               onClick={() => setMobileOpen(false)}
               aria-label="Tutup menu navigasi"
             >
@@ -220,22 +228,48 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
             </Button>
           </div>
 
+          {/* Expand trigger neatly placed in rail mode */}
+          {collapsed && (
+            <div className="hidden md:flex justify-center border-b border-border py-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-foreground/80 hover:text-foreground"
+                    onClick={() => setCollapsed(false)}
+                    aria-label="Perluas bilah samping"
+                  >
+                    <PanelLeftOpen className="size-4" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Perluas menu</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
+
           {/* Navigation Groups */}
-          <nav className="flex-1 overflow-y-auto px-2.5 py-3">
-            <div className="flex flex-col gap-4">
-              {NAV_GROUPS.map((group) => {
+          <nav
+            className={cn(
+              "flex-1 overflow-y-auto",
+              collapsed ? "no-scrollbar px-1.5 py-2.5" : "px-3 py-4"
+            )}
+          >
+            <div className={cn("flex flex-col", collapsed ? "gap-1.5" : "gap-4")}>
+              {NAV_GROUPS.map((group, gIdx) => {
                 const isOpen = !closedGroups[group.id];
                 if (collapsed) {
                   return (
-                    <div key={group.id} className="hidden md:flex flex-col gap-1">
-                      <Separator className="my-1" />
-                      {group.items.map(renderNavLink)}
+                    <div key={group.id} className="hidden md:flex flex-col items-center gap-1">
+                      {gIdx > 0 && <Separator className="my-1 w-7" />}
+                      {group.items.map((item) => renderNavLink(item, true))}
                     </div>
                   );
                 }
                 return (
                   <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleGroup(group.id)}>
-                    <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground hover:text-foreground cursor-pointer">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground hover:text-foreground cursor-pointer">
                       <span>{group.label}</span>
                       {isOpen ? (
                         <ChevronDown className="size-3.5" aria-hidden="true" />
@@ -244,43 +278,51 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
                       )}
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-1 flex flex-col gap-0.5">
-                      {group.items.map(renderNavLink)}
+                      {group.items.map((item) => renderNavLink(item, false))}
                     </CollapsibleContent>
                   </Collapsible>
                 );
               })}
 
-              {/* Mobile expanded view even if desktop state was collapsed */}
+              {/* Mobile drawer always renders full labels even if desktop rail was collapsed */}
               {collapsed &&
                 NAV_GROUPS.map((group) => (
                   <div key={`mob-${group.id}`} className="flex flex-col gap-1 md:hidden">
-                    <span className="px-2 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground">
+                    <span className="px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
                       {group.label}
                     </span>
-                    {group.items.map(renderNavLink)}
+                    {group.items.map((item) => renderNavLink(item, false))}
                   </div>
                 ))}
             </div>
           </nav>
 
-          {/* Footer Theme & Privacy */}
-          <div className="border-t border-border p-2.5 flex flex-col gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size={collapsed ? "icon" : "sm"}
-              className={cn("w-full", !collapsed && "justify-start")}
-              onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
-              aria-label="Ubah tema tampilan"
-              title="Ubah tema Terang / Gelap"
-            >
-              {theme === "light" ? (
-                <Moon className="size-4" data-icon={collapsed ? undefined : "inline-start"} aria-hidden="true" />
-              ) : (
-                <Sun className="size-4" data-icon={collapsed ? undefined : "inline-start"} aria-hidden="true" />
+          {/* Footer Theme Switcher & Brand Meta */}
+          <div className={cn("shrink-0 border-t border-border flex flex-col gap-2", collapsed ? "items-center p-2" : "p-3")}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size={collapsed ? "icon" : "sm"}
+                  className={cn(collapsed ? "size-9" : "w-full justify-start")}
+                  onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
+                  aria-label="Ubah tema tampilan"
+                >
+                  {theme === "light" ? (
+                    <Moon className="size-4" data-icon={collapsed ? undefined : "inline-start"} aria-hidden="true" />
+                  ) : (
+                    <Sun className="size-4" data-icon={collapsed ? undefined : "inline-start"} aria-hidden="true" />
+                  )}
+                  {!collapsed && <span>{theme === "light" ? "Mode Gelap" : "Mode Terang"}</span>}
+                </Button>
+              </TooltipTrigger>
+              {collapsed && (
+                <TooltipContent side="right">
+                  {theme === "light" ? "Aktifkan Mode Gelap" : "Aktifkan Mode Terang"}
+                </TooltipContent>
               )}
-              {!collapsed && <span>{theme === "light" ? "Mode Gelap" : "Mode Terang"}</span>}
-            </Button>
+            </Tooltip>
             {!collapsed && (
               <p className="px-1 text-[11px] leading-snug text-muted-foreground">
                 Lokal &amp; Terkendali Pengguna · v{config?.version || "1.0"}
@@ -291,7 +333,7 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
 
         {/* Main Workspace Column */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Mobile Only Top Header (hidden on md+ so zero duplicate nav on desktop) */}
+          {/* Mobile Only Top Header */}
           <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
             <Button
               type="button"
@@ -303,7 +345,10 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
               <Menu className="size-4" data-icon="inline-start" aria-hidden="true" />
               <span>Menu</span>
             </Button>
-            <span className="font-serif text-base font-bold text-foreground">{appName}</span>
+            <div className="flex items-center gap-2">
+              <img src={iconLogo} alt={appName} className="size-6 object-contain" />
+              <span className="font-serif text-base font-semibold text-foreground">{appName}</span>
+            </div>
             <Button
               type="button"
               variant="ghost"
@@ -315,7 +360,7 @@ export const Layout: React.FC<LayoutProps> = ({ config }) => {
             </Button>
           </header>
 
-          <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
             <Outlet />
           </main>
         </div>
