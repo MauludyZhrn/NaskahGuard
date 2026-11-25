@@ -1,0 +1,150 @@
+{
+  "passed": true,
+  "console_errors": [],
+  "page_errors": [],
+  "bad_http": [],
+  "dark_mode_verified": true,
+  "checks_count": 17,
+  "layout_checks": [
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/new-check",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/history",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/plagiarism-checks",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/ai-checks",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/combined-reports",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/documents",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/corpus",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/discovery-monitor",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/repositories",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/reports/15d4fdee-0b42-48a1-baa4-c545a19a2dc1",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/analytics",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/analytics/ai",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/settings",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/models",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "tablet_768",
+      "route": "/new-check",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "mobile_390",
+      "route": "/new-check",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    }
+  ],
+  "screenshots_saved": [
+    "01_dashboard.png",
+    "02_new_check.png",
+    "03_history.png",
+    "04_plagiarism_checks.png",
+    "05_ai_checks.png",
+    "06_combined_reports.png",
+    "07_documents.png",
+    "08_corpus.png",
+    "09_discovery_monitor.png",
+    "10_repositories.png",
+    "11_report_detail_plagiarism.png",
+    "12_analytics.png",
+    "13_analytics_ai.png",
+    "14_settings.png",
+    "15_models.png",
+    "16_report_detail_ai_tab.png",
+    "17_dashboard_dark.png",
+    "18_tablet_new_check.png",
+    "19_mobile_new_check.png"
+  ]
+}

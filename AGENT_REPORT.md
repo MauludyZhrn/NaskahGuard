@@ -102,3 +102,22 @@ Laporan log pengembangan proyek **NaskahGuard** (Academic Plagiarism & Similarit
 4. **Morfologi Bahasa Indonesia, Audit Skor & Regresi Penuh**:
    - `indonesian_nlp.py` meningkatkan deteksi parafrasa Bahasa Indonesia sekaligus menjaga `FPR = 0,00` pada jargon teknis (`F1 = 1,00` pada 12 skenario ground-truth).
    - Pytest regresi offline: **31 passed, 1 skipped (`LIVE_NETWORK_TESTS`)**; Pytest live (`LIVE_NETWORK_TESTS=true`): **5 passed**; Frontend `tsc` + `vite build`: **exit 0**; Playwright UI QA 5 viewport: **exit 0** dengan 7 tangkapan layar di `docs/screenshots/phase9/`.
+
+---
+
+## Phase 10 — Complete UI/UX Rebuild & Local-First AI Writing Detection
+
+### Ringkasan Perubahan
+1. **Audit Repositori AI Detection & Agent Skill Baru**:
+   - Mengaudit `eric-mitchell/detect-gpt` (MIT), `Croups/is-it-ai` (MIT), dan `ae-saouiqui/ai-text-detection` (tanpa file `LICENSE`) untuk kompatibilitas Windows CPU, kalibrasi, serta dukungan Bahasa Indonesia.
+   - Mendokumentasikan panduan & standar kalibrasi pada [.agents/skills/ai-writing-detection/SKILL.md](.agents/skills/ai-writing-detection/SKILL.md).
+2. **Engine Deteksi Tulisan AI Terkalibrasi (`backend/app/ai_detection/`)**:
+   - Engine bawaan CPU-first `ng-id-stylo-lm-v1` (fitur *burstiness*, MATTR, penanda retorika LLM, jangkar konteks/sitasi, serta model entropi karakter 4-gram yang dilatih ketat pada `train` + *temperature scaling* pada `validation`).
+   - API Manajemen Model (`/api/models`, `/verify`, `/activate`), migrasi Alembic `0003_phase10_ai_detection.py` (`checks.mode` & `checks.ai_report`), serta mode pemeriksaan `PLAGIARISM_ONLY`, `AI_ONLY`, dan `COMBINED` yang menjaga skor AI tetap terpisah dari `similarity_index`.
+3. **Rebuild Total UI/UX (`shadcn/ui` + Tailwind CSS + `Lucide React` Only)**:
+   - Seluruh 15 rute antarmuka dibangun seragam dalam gaya *Swiss Modernism 2.0*, bebas emoji, dilengkapi tooltip penjelasan istilah, 5 jawaban ringkas laporan, pemisahan visual ketat Laporan Plagiasi vs Laporan AI pada mode Gabungan, serta halaman baru `Deteksi Tulisan AI`, `Laporan Gabungan`, `Analitik AI`, dan `Manajemen Model`.
+4. **Verifikasi Aktual Phase 10**:
+   - Pytest lengkap: **36 passed, 1 skipped** (`test_live_internet_providers_explicit`).
+   - Benchmark Plagiasi (12 skenario): **Precision `1,0000`**, **Recall `1,0000`**, **F1 `1,0000`**, **FPR `0,0000`**.
+   - Benchmark AI ID+EN (`test` n=72): **ROC-AUC `0,9537`**, **F1 (`p>=0,68`) `0,8529`**, **`strict_ai_likely_fpr = 0,0`**, rata-rata **`1,17 ms`/dokumen**; seluruh 5 uji ketahanan *false positive* & batas `< 80` kata lulus.
+   - Pemeriksaan emoji UI: **`0` temuan**; TypeScript & Vite `npm run build`: **exit 0**; Playwright UI QA 17 pengecekan (`1440×900`, `768×1024`, `390×844`, Light & Dark): **17/17 lulus (`0` overflow, `0` console error)** dengan bukti screenshot *before/after*.

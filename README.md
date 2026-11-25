@@ -86,3 +86,16 @@ backend\.venv\Scripts\python.exe scripts\smoke_test.py
   - Modul `indonesian_nlp.py` (imbuhan, sinonim akademik, urutan klausa, dan pelindung *false-positive* istilah teknis).
   - Eksekusi kueri paralel lintas provider + 4 lapisan `TTLCache` + reuse koneksi HTTP.
 - **Dokumentasi Phase 9**: [PHASE9_BROWSER_AUDIT.md](docs/research/PHASE9_BROWSER_AUDIT.md), [PHASE9_SEARCH_DESIGN.md](docs/PHASE9_SEARCH_DESIGN.md), [PHASE9_DETECTION_DESIGN.md](docs/PHASE9_DETECTION_DESIGN.md), [PHASE9_PERFORMANCE.md](docs/PHASE9_PERFORMANCE.md), [PHASE9_UI_QA.md](docs/PHASE9_UI_QA.md), [PHASE9_BENCHMARK.md](docs/PHASE9_BENCHMARK.md), dan [THIRD_PARTY_COMPONENTS.md](docs/THIRD_PARTY_COMPONENTS.md).
+
+---
+
+## Pembaruan Phase 10 — Rebuild UI/UX Lengkap & Deteksi Tulisan AI Lokal
+
+- **Redesign Antarmuka Total (`shadcn/ui` + Tailwind CSS + `Lucide React` Only)**:
+  - Penyeragaman desain *Swiss Modernism 2.0* across semua halaman (Light & Dark Mode, bilah samping 5 kelompok terstruktur tanpa navigasi ganda desktop, zero emoji ikon).
+  - Penyederhanaan istilah Bahasa Indonesia teknis (*Indeks Kemiripan*, *Kata yang Cocok*, *Jumlah Kata yang Diperiksa*, *Hanya Informasi Referensi*) disertai **Ringkasan 5 Pertanyaan Utama** di atas laporan.
+- **3 Mode Pemeriksaan Terpisah (`PLAGIARISM_ONLY`, `AI_ONLY`, `COMBINED`)**:
+  - Pilihan mode eksplisit di halaman **Pemeriksaan Baru** (`/new-check`) sebelum mengunggah berkas; skor AI **tidak pernah** dicampur ke **Indeks Kemiripan Plagiasi**.
+- **Engine Deteksi Tulisan AI Lokal (`backend/app/ai_detection/`)**:
+  - Engine CPU luring bawaan `ng-id-stylo-lm-v1` (entropi n-gram karakter + *burstiness* + stilometri ID/EN) lengkap dengan analisis per paragraf, batas minimum 80 kata (`INSUFFICIENT_DATA`), manajemen model (`/models`), serta peringatan keterbatasan probabilistik.
+- **Dokumentasi & Skill Phase 10**: [ai-writing-detection](.agents/skills/ai-writing-detection/SKILL.md), [UI_REDESIGN.md](docs/UI_REDESIGN.md), [AI_DETECTION_ARCHITECTURE.md](docs/AI_DETECTION_ARCHITECTURE.md), [AI_DETECTION_BENCHMARK.md](docs/AI_DETECTION_BENCHMARK.md), [AI_DETECTION_LIMITATIONS.md](docs/AI_DETECTION_LIMITATIONS.md), dan [PHASE10_QA_REPORT.md](docs/PHASE10_QA_REPORT.md).
