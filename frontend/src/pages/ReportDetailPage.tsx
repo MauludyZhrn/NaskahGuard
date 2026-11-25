@@ -1,17 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   AlertTriangle,
+  BookOpen,
   Bot,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Database,
   Download,
   ExternalLink,
   FileSearch2,
   FileText,
-  GitBranch,
+  Filter,
   Globe,
   Layers,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
@@ -28,19 +32,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { NumberTicker } from "@/components/ui/number-ticker";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiFetch, downloadProtectedFile } from "../api/client";
 import { InfoHint } from "../components/InfoHint";
-import { PageHeader } from "../components/PageHeader";
 import { ProcessFlowchart } from "../components/ProcessFlowchart";
 import { SimilarityGauge } from "../components/SimilarityGauge";
 import { AiClassificationBadge, ModeBadge, similarityToneClass } from "../components/StatusBadge";
-import { FullReport, ReportMatch, ReportSource, SourceViewerPayload, ViewerPayload } from "../types";
+import {
+  FullReport,
+  ReportMatch,
+  ReportSource,
+  SourceViewerPayload,
+  ViewerPayload,
+  ViewerSegment,
+} from "../types";
 import { formatDuration, formatMs } from "../utils/format";
 
 const MATCHES_PAGE_SIZE = 15;
@@ -52,6 +59,115 @@ const LAYER_LABELS: Record<string, string> = {
   SEMANTIC: "Kandidat Kemiripan Makna",
   EXCLUDED: "Dikecualikan",
 };
+
+const FALLBACK_PALETTE = [
+  "#6E1F2F",
+  "#1D4ED8",
+  "#15803D",
+  "#7E22CE",
+  "#B45309",
+  "#0F766E",
+  "#BE123C",
+  "#4338CA",
+];
+
+function formatContributionPct(pct: number): string {
+  if (pct > 0 && pct < 1) return "<1%";
+  return `${pct.toFixed(1)}%`;
+}
+
+function formatBytes(sizeBytes?: number): string {
+  if (!sizeBytes || sizeBytes <= 0) return "-";
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatDateId(iso?: string | null): string {
+  if (!iso) return "-";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return iso;
+  return dt.toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function pillColor(rank?: number | null, explicit?: string | null): string {
+  if (explicit) return explicit;
+  if (!rank || rank < 1) return FALLBACK_PALETTE[0];
+  return FALLBACK_PALETTE[(rank - 1) % FALLBACK_PALETTE.length];
+}
+
+interface AnnotatedParaChunk {
+  text: string;
+  category: ViewerSegment["category"];
+  match_ids: number[];
+  source_rank?: number | null;
+  source_color?: string | null;
+  excluded_reason?: string | null;
+}
+
+interface AnnotatedParaRow {
+  id: number;
+  pills: Array<{ rank: number; color: string; firstMatchId: number | null }>;
+  chunks: AnnotatedParaChunk[];
+}
+
+function groupSegmentsIntoParagraphs(segments: ViewerSegment[]): AnnotatedParaRow[] {
+  const rows: AnnotatedParaRow[] = [];
+  let currentChunks: AnnotatedParaChunk[] = [];
+  let rowId = 0;
+
+  const flushRow = () => {
+    if (!currentChunks.length) return;
+    const seenRanks = new Map<number, { rank: number; color: string; firstMatchId: number | null }>();
+    for (const ch of currentChunks) {
+      if (ch.category !== "PLAIN" && ch.category !== "EXCLUDED" && ch.source_rank) {
+        if (!seenRanks.has(ch.source_rank)) {
+          seenRanks.set(ch.source_rank, {
+            rank: ch.source_rank,
+            color: pillColor(ch.source_rank, ch.source_color),
+            firstMatchId: ch.match_ids[0] ?? null,
+          });
+        }
+      }
+    }
+    const hasNonWhitespace = currentChunks.some((c) => c.text.trim().length > 0);
+    if (hasNonWhitespace) {
+      rows.push({
+        id: rowId++,
+        pills: Array.from(seenRanks.values()).sort((a, b) => a.rank - b.rank),
+        chunks: currentChunks,
+      });
+    }
+    currentChunks = [];
+  };
+
+  for (const seg of segments) {
+    const parts = seg.text.split("\n");
+    parts.forEach((part, idx) => {
+      if (part.length > 0) {
+        currentChunks.push({
+          text: part,
+          category: seg.category,
+          match_ids: seg.match_ids,
+          source_rank: seg.source_rank,
+          source_color: seg.source_color,
+          excluded_reason: seg.excluded_reason,
+        });
+      }
+      if (idx < parts.length - 1) {
+        flushRow();
+      }
+    });
+  }
+  flushRow();
+  return rows;
+}
 
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -73,6 +189,7 @@ export const ReportDetailPage: React.FC = () => {
   const [viewer, setViewer] = useState<ViewerPayload | null>(null);
   const [sourceViewer, setSourceViewer] = useState<SourceViewerPayload | null>(null);
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
+  const [selectedSourceRank, setSelectedSourceRank] = useState<number | null>(null);
   const [selectedLayerFilter, setSelectedLayerFilter] = useState<string>("ALL");
   const [matchesPage, setMatchesPage] = useState(1);
   const [sectionTab, setSectionTab] = useState<"plagiarism" | "ai">("plagiarism");
@@ -110,12 +227,19 @@ export const ReportDetailPage: React.FC = () => {
       .catch((err: Error) => setError(err.message));
   }, [checkId]);
 
+  const annotatedParagraphs = useMemo(() => {
+    if (!viewer?.segments?.length) return [];
+    return groupSegmentsIntoParagraphs(viewer.segments);
+  }, [viewer]);
+
   const filteredMatches = useMemo(() => {
     if (!report) return [];
-    return report.matches.filter((m) =>
-      selectedLayerFilter === "ALL" ? true : m.layer === selectedLayerFilter
-    );
-  }, [report, selectedLayerFilter]);
+    return report.matches.filter((m) => {
+      if (selectedLayerFilter !== "ALL" && m.layer !== selectedLayerFilter) return false;
+      if (selectedSourceRank !== null && m.source_rank !== selectedSourceRank) return false;
+      return true;
+    });
+  }, [report, selectedLayerFilter, selectedSourceRank]);
 
   const totalMatchPages = Math.max(1, Math.ceil(filteredMatches.length / MATCHES_PAGE_SIZE));
   const pagedMatches = useMemo(() => {
@@ -123,22 +247,73 @@ export const ReportDetailPage: React.FC = () => {
     return filteredMatches.slice(start, start + MATCHES_PAGE_SIZE);
   }, [filteredMatches, matchesPage]);
 
-  const handleSelectSegment = async (matchIds: number[]) => {
+  const loadSourceById = async (sourceDocId: string) => {
+    if (!checkId) return;
+    try {
+      const sv = await apiFetch<SourceViewerPayload>(`/checks/${checkId}/sources/${sourceDocId}/viewer`);
+      setSourceViewer(sv);
+    } catch {
+      // Ignore preview error cleanly
+    }
+  };
+
+  const handleSelectSegment = async (matchIds: number[], rank?: number | null) => {
     if (!matchIds.length || !report || !checkId) return;
     const mid = matchIds[0];
     setActiveMatchId(mid);
+    if (rank) setSelectedSourceRank(rank);
     const matchObj = report.matches.find((m) => m.id === mid);
     if (matchObj && sourceViewer?.source_document_id !== matchObj.source_document_id) {
-      try {
-        const sv = await apiFetch<SourceViewerPayload>(
-          `/checks/${checkId}/sources/${matchObj.source_document_id}/viewer`
-        );
-        setSourceViewer(sv);
-      } catch {
-        // Ignore preview error cleanly
-      }
+      await loadSourceById(matchObj.source_document_id);
     }
   };
+
+  const handleJumpToSource = async (src: ReportSource) => {
+    setSelectedSourceRank(src.rank);
+    setPlagInnerTab("compare");
+    const firstMatch = report?.matches.find((m) => m.source_document_id === src.source_document_id);
+    if (firstMatch) setActiveMatchId(firstMatch.id);
+    await loadSourceById(src.source_document_id);
+  };
+
+  const renderedSourceText = useMemo(() => {
+    if (!sourceViewer) return null;
+    const text = sourceViewer.text || "";
+    const highlights = (sourceViewer.highlights || [])
+      .filter((h) => h.src_char_end > h.src_char_start)
+      .sort((a, b) => a.src_char_start - b.src_char_start);
+    if (!highlights.length) return text;
+
+    const activeSrc = report?.sources.find((s) => s.source_document_id === sourceViewer.source_document_id);
+    const srcColor = pillColor(activeSrc?.rank, activeSrc?.color_hex);
+
+    const nodes: React.ReactNode[] = [];
+    let cursor = 0;
+    highlights.forEach((h, i) => {
+      const start = Math.max(cursor, Math.min(h.src_char_start, text.length));
+      const end = Math.max(start, Math.min(h.src_char_end, text.length));
+      if (start > cursor) {
+        nodes.push(<span key={`p-${i}`}>{text.slice(cursor, start)}</span>);
+      }
+      if (end > start) {
+        const isCurrent = activeMatchId === h.match_id;
+        nodes.push(
+          <span
+            key={`h-${h.match_id}-${i}`}
+            className={`hl-seg hl-source-tinted ${isCurrent ? "hl-active" : ""}`}
+            style={{ ["--src-color" as any]: srcColor }}
+          >
+            {text.slice(start, end)}
+          </span>
+        );
+      }
+      cursor = Math.max(cursor, end);
+    });
+    if (cursor < text.length) {
+      nodes.push(<span key="tail">{text.slice(cursor)}</span>);
+    }
+    return nodes;
+  }, [sourceViewer, activeMatchId, report?.sources]);
 
   if (error) {
     return (
@@ -152,7 +327,7 @@ export const ReportDetailPage: React.FC = () => {
   if (!report) {
     return (
       <div className="flex flex-col gap-5">
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-32 w-full" />
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-72 w-full" />
       </div>
@@ -175,81 +350,123 @@ export const ReportDetailPage: React.FC = () => {
     report.coverage?.metadata_only_sources ??
     0;
   const aiReport = report.ai_report;
+  const activeFilters = report.active_filters || [];
+  const integrityFlags = report.integrity_flags || [];
+  const srcCat = report.source_categories || {
+    internet_pct: 0,
+    publication_pct: 0,
+    local_pct: 0,
+    counts: { internet: 0, publication: 0, local: 0 },
+  };
 
   return (
     <BlurFade duration={0.2}>
       <div className="flex flex-col gap-6">
-        <PageHeader
-          title={report.document.title || report.document.filename}
-          description={`Nomor Laporan ${report.report_number} · ${report.document.word_count.toLocaleString("id-ID")} kata total · Waktu proses ${formatDuration(report.duration_seconds)}`}
-          badge={<ModeBadge mode={mode} />}
-          actions={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => downloadProtectedFile(`/checks/${report.check_id}/export.pdf`, `${report.report_number}.pdf`)}
-              >
-                <Download className="size-4" data-icon="inline-start" aria-hidden="true" />
-                <span>PDF</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => downloadProtectedFile(`/checks/${report.check_id}/export.html`, `${report.report_number}.html`)}
-              >
-                <Download className="size-4" data-icon="inline-start" aria-hidden="true" />
-                <span>HTML</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => downloadProtectedFile(`/checks/${report.check_id}/export.json`, `${report.report_number}.json`)}
-              >
-                <Download className="size-4" data-icon="inline-start" aria-hidden="true" />
-                <span>JSON</span>
-              </Button>
-            </>
-          }
-        />
-
-        {/* 5 Plain-Language Questions Summary Card */}
-        {report.plain_summary && (
-          <Card className="shadow-none">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Ringkasan Hasil dalam Bahasa Sederhana</CardTitle>
-              <CardDescription>
-                Jawaban singkat terhadap lima hal utama yang perlu diketahui penulis maupun penelaah naskah.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {[
-                { q: "1. Bagaimana tingkat kemiripan dokumen ini?", a: report.plain_summary.similarity_answer },
-                { q: "2. Apakah ditemukan bagian mirip sumber?", a: report.plain_summary.sources_answer },
-                { q: "3. Apakah terindikasi tulisan AI?", a: report.plain_summary.ai_answer },
-                { q: "4. Bagian mana yang perlu diperiksa ulang?", a: report.plain_summary.review_answer },
-                { q: "5. Sejauh mana sumber telah diperiksa?", a: report.plain_summary.coverage_answer },
-              ].map((item) => (
-                <div key={item.q} className="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-foreground">{item.q}</span>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{item.a}</p>
+        {/* Institutional Cover / Document Details Card */}
+        <Card className="shadow-none overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                    Laporan Integritas Naskah
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                    {report.report_number}
+                  </span>
+                  <ModeBadge mode={mode} />
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+
+                <h1 className="font-serif text-2xl font-bold leading-snug tracking-tight text-foreground sm:text-[26px]">
+                  {report.document.title || report.document.filename}
+                </h1>
+
+                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <FileText className="size-3.5 text-primary/70" aria-hidden="true" />
+                    <strong className="font-medium text-foreground">{report.document.filename}</strong>
+                  </span>
+                  {report.document.size_bytes ? (
+                    <span className="tabular-nums">Ukuran: {formatBytes(report.document.size_bytes)}</span>
+                  ) : null}
+                  <span>Selesai: {formatDateId(report.finished_at || report.created_at)}</span>
+                  <span>Durasi: {formatDuration(report.duration_seconds)}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:items-end">
+                {/* Export Actions */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={() =>
+                      downloadProtectedFile(`/checks/${report.check_id}/export.pdf`, `${report.report_number}.pdf`)
+                    }
+                  >
+                    <Download className="size-3.5" data-icon="inline-start" aria-hidden="true" />
+                    <span>Unduh PDF</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      downloadProtectedFile(`/checks/${report.check_id}/export.html`, `${report.report_number}.html`)
+                    }
+                  >
+                    <Download className="size-3.5" data-icon="inline-start" aria-hidden="true" />
+                    <span>HTML</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      downloadProtectedFile(`/checks/${report.check_id}/export.json`, `${report.report_number}.json`)
+                    }
+                  >
+                    <Download className="size-3.5" data-icon="inline-start" aria-hidden="true" />
+                    <span>JSON</span>
+                  </Button>
+                </div>
+
+                {/* Institutional Page · Word · Character Strip */}
+                <div className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-muted/40 text-center">
+                  <div className="px-3.5 py-2">
+                    <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Halaman</div>
+                    <div className="font-serif text-base font-bold tabular-nums text-foreground">
+                      {(report.document.page_count || 1).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                  <div className="px-3.5 py-2">
+                    <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Kata</div>
+                    <div className="font-serif text-base font-bold tabular-nums text-foreground">
+                      {(report.document.word_count || 0).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                  <div className="px-3.5 py-2">
+                    <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Karakter</div>
+                    <div className="font-serif text-base font-bold tabular-nums text-foreground">
+                      {(report.document.character_count || 0).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Strict Top-Level Separation Between Plagiarism Report and AI Report in COMBINED Mode */}
         {isCombined && hasAiReport && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3.5">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Layers className="size-4 text-primary" aria-hidden="true" />
               <span>
-                Mode Gabungan memisahkan <strong className="text-foreground">Laporan Plagiasi</strong> dan{" "}
-                <strong className="text-foreground">Laporan Deteksi AI</strong> secara ketat tanpa menggabungkan angkanya.
+                Mode Gabungan memisahkan <strong className="text-foreground">Laporan Kemiripan Naskah</strong> dan{" "}
+                <strong className="text-foreground">Laporan Deteksi Tulisan AI</strong> secara ketat tanpa menggabungkan skornya.
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -260,7 +477,7 @@ export const ReportDetailPage: React.FC = () => {
                 onClick={() => setSectionTab("plagiarism")}
               >
                 <FileSearch2 className="size-3.5" data-icon="inline-start" aria-hidden="true" />
-                <span>Laporan Plagiasi ({simVal.toFixed(1)}%)</span>
+                <span>Laporan Kemiripan ({simVal.toFixed(1)}%)</span>
               </Button>
               <Button
                 type="button"
@@ -284,73 +501,243 @@ export const ReportDetailPage: React.FC = () => {
         {/* ================== SECTION A: PLAGIARISM REPORT ================== */}
         {mode !== "AI_ONLY" && (sectionTab === "plagiarism" || !isCombined) && (
           <div className="flex flex-col gap-6">
-            {/* Hero Score Card */}
-            <Card className="shadow-none">
-              <CardContent className="flex flex-col gap-5 p-6 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-5">
-                  <SimilarityGauge
-                    value={simVal}
-                    level={metrics.operational_category?.level || "-"}
-                    thresholdLow={thresholdLow}
-                    thresholdHigh={thresholdHigh}
-                  />
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-foreground">Indeks Kemiripan</span>
-                      <InfoHint text="Persentase kata yang cocok pada naskah bersih setelah pengecualian dan pencegahan penghitungan ganda." />
+            {/* Ringkasan Integritas Institutional Panel */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+              {/* Overall Similarity & Active Exclusions */}
+              <Card className="shadow-none lg:col-span-5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    Kemiripan Keseluruhan
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex items-center gap-5">
+                    <SimilarityGauge
+                      value={simVal}
+                      level={metrics.operational_category?.level || "-"}
+                      thresholdLow={thresholdLow}
+                      thresholdHigh={thresholdHigh}
+                    />
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`font-serif text-4xl font-bold tabular-nums ${similarityToneClass(simVal)}`}>
+                          {simVal.toFixed(1)}%
+                        </span>
+                        <InfoHint text="Persentase kata unik pada naskah bersih yang cocok dengan sumber pembanding tanpa penghitungan ganda." />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong className="text-foreground">{(metrics.matched_words ?? 0).toLocaleString("id-ID")}</strong> dari{" "}
+                        <strong className="text-foreground">{(metrics.eligible_words ?? 0).toLocaleString("id-ID")}</strong> kata diperiksa
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Kategori: <strong className="text-foreground">{metrics.operational_category?.level || "-"}</strong>
+                      </p>
                     </div>
-                    <p className={`text-2xl font-bold tabular-nums ${similarityToneClass(simVal)}`}>
-                      {simVal.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Kategori operasional: <strong>{metrics.operational_category?.level || "-"}</strong>
-                    </p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:min-w-[420px]">
-                  <div className="rounded-md border border-border p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Kata yang Cocok</span>
-                      <InfoHint text="Jumlah kata unik pada naskah yang cocok dengan sumber pembanding." />
+                  {/* Active Filters / Exclusions */}
+                  <div className="rounded-lg border border-border bg-muted/35 p-3">
+                    <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <Filter className="size-3.5 text-primary/75" aria-hidden="true" />
+                      <span>Bagian yang Dikecualikan</span>
                     </div>
-                    <p className="mt-1 text-lg font-bold tabular-nums">
-                      <NumberTicker value={metrics.matched_words ?? 0} />
-                    </p>
+                    {activeFilters.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeFilters.map((f) => (
+                          <Badge key={f} variant="secondary" className="text-[11px] font-normal">
+                            {f}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Seluruh bagian naskah diperiksa tanpa pengecualian.</p>
+                    )}
                   </div>
-                  <div className="rounded-md border border-border p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Kata Diperiksa</span>
-                      <InfoHint text="Jumlah kata inti di luar daftar pustaka atau bagian yang dikecualikan." />
+                </CardContent>
+              </Card>
+
+              {/* Source Categories Breakdown */}
+              <Card className="shadow-none lg:col-span-4">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    Kelompok Sumber Cocok
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Kontribusi eksklusif berdasarkan jenis sumber ({fulltextCompared} dokumen teks lengkap dibandingkan).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3.5 pt-1">
+                  {[
+                    {
+                      label: "Sumber Internet",
+                      pct: srcCat.internet_pct,
+                      count: srcCat.counts?.internet ?? 0,
+                      icon: Globe,
+                      barColor: "#1D4ED8",
+                    },
+                    {
+                      label: "Publikasi Ilmiah",
+                      pct: srcCat.publication_pct,
+                      count: srcCat.counts?.publication ?? 0,
+                      icon: BookOpen,
+                      barColor: "#6E1F2F",
+                    },
+                    {
+                      label: "Korpus Lokal",
+                      pct: srcCat.local_pct,
+                      count: srcCat.counts?.local ?? 0,
+                      icon: Database,
+                      barColor: "#15803D",
+                    },
+                  ].map((row) => {
+                    const Icon = row.icon;
+                    return (
+                      <div key={row.label} className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                            <Icon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                            {row.label}
+                            <span className="text-muted-foreground font-normal">({row.count})</span>
+                          </span>
+                          <span className="font-semibold tabular-nums text-foreground">
+                            {formatContributionPct(row.pct)}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(100, Math.max(row.pct > 0 ? 3 : 0, row.pct))}%`,
+                              backgroundColor: row.barColor,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              {/* Integrity Flags Card */}
+              <Card className="shadow-none lg:col-span-3">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    {integrityFlags.length > 0 ? (
+                      <ShieldAlert className="size-4 text-amber-600" aria-hidden="true" />
+                    ) : (
+                      <ShieldCheck className="size-4 text-emerald-700" aria-hidden="true" />
+                    )}
+                    <span>Tanda Integritas</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2.5">
+                  {integrityFlags.length === 0 ? (
+                    <div className="rounded-lg border border-border bg-muted/35 p-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                        <CheckCircle2 className="size-4 text-emerald-700 shrink-0" aria-hidden="true" />
+                        <span>Tidak Ada Anomali Karakter</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        Tidak terdeteksi penggantian huruf (homoglyph) maupun karakter lebar-nol tersembunyi di dalam kata.
+                      </p>
                     </div>
-                    <p className="mt-1 text-lg font-bold tabular-nums">
-                      <NumberTicker value={metrics.eligible_words ?? 0} />
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border p-3 col-span-2 sm:col-span-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Sumber Dibandingkan</span>
-                      <InfoHint text="Dokumen sumber berteks lengkap yang dibandingkan terhadap naskah." />
-                    </div>
-                    <p className="mt-1 text-lg font-bold tabular-nums">
-                      <NumberTicker value={fulltextCompared} />
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  ) : (
+                    <>
+                      {integrityFlags.map((flag) => (
+                        <div
+                          key={flag.code}
+                          className="rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 flex flex-col gap-1"
+                        >
+                          <span className="text-xs font-semibold text-foreground">{flag.title}</span>
+                          <span className="text-xs font-medium text-amber-800 dark:text-amber-300">{flag.summary}</span>
+                          <span className="text-[11px] leading-relaxed text-muted-foreground">{flag.detail}</span>
+                        </div>
+                      ))}
+                      <p className="rounded-md bg-muted/50 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                        Tanda integritas bersifat indikatif. Tinjauan manusia tetap diperlukan untuk memverifikasi konteks penulisan.
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Plagiarism Sub-Tabs */}
             <Tabs value={plagInnerTab} onValueChange={setPlagInnerTab} className="w-full">
               <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-muted p-1">
-                <TabsTrigger value="summary">Ringkasan</TabsTrigger>
-                <TabsTrigger value="compare">Bandingkan Teks ({report.matches.length})</TabsTrigger>
-                <TabsTrigger value="sources">Sumber Cocok ({report.sources.length})</TabsTrigger>
+                <TabsTrigger value="summary">Ringkasan &amp; Sumber Utama</TabsTrigger>
+                <TabsTrigger value="compare">Naskah Berpenanda ({report.matches.length})</TabsTrigger>
+                <TabsTrigger value="sources">Daftar Sumber Lengkap ({report.sources.length})</TabsTrigger>
                 <TabsTrigger value="coverage">Cakupan Pemeriksaan</TabsTrigger>
                 <TabsTrigger value="analytics">Analitik &amp; Alur</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="summary" className="mt-4 flex flex-col gap-4">
+              <TabsContent value="summary" className="mt-4 flex flex-col gap-5">
+                {/* Top Sources Colored Ranked List */}
+                <Card className="shadow-none">
+                  <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
+                    <div>
+                      <CardTitle className="text-base">Daftar Sumber Utama</CardTitle>
+                      <CardDescription>
+                        Nomor dan warna sumber sama dengan penanda pada Naskah Berpenanda serta laporan PDF. Klik sumber untuk langsung meninjau padanan teks.
+                      </CardDescription>
+                    </div>
+                    {report.sources.length > 6 && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => setPlagInnerTab("sources")}>
+                        Lihat semua ({report.sources.length})
+                      </Button>
+                    )}
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    {report.sources.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                        Tidak ditemukan sumber dengan kecocokan teks pada sesi pemeriksaan ini.
+                      </div>
+                    ) : (
+                      report.sources.slice(0, 8).map((src) => {
+                        const badgeHex = pillColor(src.rank, src.color_hex);
+                        return (
+                          <div
+                            key={src.source_document_id}
+                            onClick={() => handleJumpToSource(src)}
+                            className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5 transition-colors hover:bg-accent/50"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <span className="source-rank-pill shrink-0" style={{ backgroundColor: badgeHex }}>
+                                {src.rank}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="truncate text-sm font-medium text-foreground">{src.title}</span>
+                                  <span
+                                    className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10.5px] font-medium"
+                                    style={{
+                                      backgroundColor: src.chip_bg_hex || "var(--muted)",
+                                      color: src.chip_text_hex || "var(--foreground)",
+                                    }}
+                                  >
+                                    {src.category_label || src.source_type}
+                                  </span>
+                                </div>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {src.authors?.length ? src.authors.join(", ") : src.provider || "Korpus Lokal"}
+                                  {src.year ? ` (${src.year})` : ""}
+                                  {src.doi ? ` · DOI: ${src.doi}` : ""}
+                                  {` · ${src.matched_words_exclusive} kata unik`}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="shrink-0 font-serif text-base font-bold tabular-nums text-foreground">
+                              {formatContributionPct(src.contribution_pct)}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Layer Breakdown + Plain Summary */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Card className="shadow-none">
                     <CardHeader className="pb-3">
@@ -384,7 +771,7 @@ export const ReportDetailPage: React.FC = () => {
                     </CardHeader>
                     <CardContent className="flex flex-col gap-3 text-sm">
                       <div className="flex items-center justify-between border-b border-border pb-2">
-                        <span>Dokumen Sumber yang Dibandingkan (Teks Lengkap)</span>
+                        <span>Dokumen Sumber Dibandingkan (Teks Lengkap)</span>
                         <strong className="tabular-nums">{fulltextCompared}</strong>
                       </div>
                       <div className="flex items-center justify-between border-b border-border pb-2">
@@ -396,14 +783,36 @@ export const ReportDetailPage: React.FC = () => {
                         <strong className="tabular-nums">{metadataOnlyCount}</strong>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {report.coverage?.statement || "Sistem hanya menghitung kecocokan dari sumber berteks lengkap yang berhasil diakses."}
+                        {report.coverage?.statement ||
+                          "Sistem hanya menghitung kecocokan dari sumber berteks lengkap yang berhasil diakses."}
                       </p>
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Progressive Disclosure Accordion for Technical Details */}
+                {/* Plain-Language 5-Point Interpretation + Formula Disclosure */}
                 <Accordion type="multiple" className="rounded-xl border border-border bg-card px-5">
+                  {report.plain_summary && (
+                    <AccordionItem value="plain">
+                      <AccordionTrigger className="hover:no-underline text-sm font-semibold">
+                        Ringkasan Interpretasi Bahasa Sederhana (5 Pertanyaan Utama)
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {[
+                          { q: "1. Tingkat kemiripan dokumen", a: report.plain_summary.similarity_answer },
+                          { q: "2. Sumber pembanding yang cocok", a: report.plain_summary.sources_answer },
+                          { q: "3. Indikasi pola tulisan AI", a: report.plain_summary.ai_answer },
+                          { q: "4. Bagian yang perlu ditinjau", a: report.plain_summary.review_answer },
+                          { q: "5. Cakupan pemeriksaan sumber", a: report.plain_summary.coverage_answer },
+                        ].map((item) => (
+                          <div key={item.q} className="rounded-md border border-border bg-muted/30 p-3 flex flex-col gap-1">
+                            <span className="text-xs font-semibold text-foreground">{item.q}</span>
+                            <p className="text-xs leading-relaxed text-muted-foreground">{item.a}</p>
+                          </div>
+                        ))}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
                   <AccordionItem value="formula" className="border-b-0">
                     <AccordionTrigger className="hover:no-underline text-sm font-semibold">
                       Detail Rumus Penghitungan Skor &amp; Durasi Tahapan
@@ -419,7 +828,10 @@ export const ReportDetailPage: React.FC = () => {
                       </p>
                       {metrics.stage_timings_ms && (
                         <p className="tabular-nums">
-                          Durasi eksekusi: {Object.entries(metrics.stage_timings_ms).map(([k, v]) => `${k}: ${formatMs(v)}`).join(" · ")}
+                          Durasi eksekusi:{" "}
+                          {Object.entries(metrics.stage_timings_ms)
+                            .map(([k, v]) => `${k}: ${formatMs(v)}`)
+                            .join(" · ")}
                         </p>
                       )}
                     </AccordionContent>
@@ -427,32 +839,130 @@ export const ReportDetailPage: React.FC = () => {
                 </Accordion>
               </TabsContent>
 
+              {/* ================== ANNOTATED MANUSCRIPT COMPARISON TAB ================== */}
               <TabsContent value="compare" className="mt-4 flex flex-col gap-4">
+                {/* Interactive Colored Source Legend Strip */}
+                {report.sources.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3.5 py-2.5">
+                    <span className="text-xs font-semibold text-muted-foreground mr-1">Filter Sumber:</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={selectedSourceRank === null ? "default" : "outline"}
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => {
+                        setSelectedSourceRank(null);
+                        setMatchesPage(1);
+                      }}
+                    >
+                      Semua
+                    </Button>
+                    {report.sources.slice(0, 10).map((src) => {
+                      const active = selectedSourceRank === src.rank;
+                      const bgHex = pillColor(src.rank, src.color_hex);
+                      return (
+                        <button
+                          key={src.source_document_id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSourceRank(active ? null : src.rank);
+                            setMatchesPage(1);
+                            loadSourceById(src.source_document_id);
+                          }}
+                          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${
+                            active
+                              ? "border-primary bg-primary/10 text-foreground font-semibold"
+                              : "border-border bg-background text-muted-foreground hover:bg-accent"
+                          }`}
+                        >
+                          <span
+                            className="inline-flex size-4 items-center justify-center rounded text-[10px] font-bold text-white"
+                            style={{ backgroundColor: bgHex }}
+                          >
+                            {src.rank}
+                          </span>
+                          <span className="max-w-[140px] truncate">{src.title}</span>
+                          <span className="tabular-nums opacity-75">{formatContributionPct(src.contribution_pct)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {viewer ? (
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <Card className="shadow-none">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Naskah yang Diperiksa</CardTitle>
-                        <CardDescription>Klik bagian berwarna untuk melihat padanannya di sumber pembanding.</CardDescription>
+                        <CardTitle className="text-sm">Naskah Berpenanda</CardTitle>
+                        <CardDescription>
+                          Nomor di tepi kiri sesuai daftar sumber. Klik sorotan warna untuk menyinkronkan sumber pembanding.
+                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="viewer-pane">
-                          {viewer.segments.map((seg, idx) =>
-                            seg.category === "PLAIN" ? (
-                              <span key={idx}>{seg.text}</span>
-                            ) : (
-                              <span
-                                key={idx}
-                                onClick={() => handleSelectSegment(seg.match_ids)}
-                                className={`hl-seg hl-${seg.category} ${
-                                  activeMatchId && seg.match_ids.includes(activeMatchId) ? "hl-active" : ""
-                                }`}
-                                title={LAYER_LABELS[seg.category] || seg.category}
-                              >
-                                {seg.text}
-                              </span>
-                            )
-                          )}
+                        <div className="viewer-pane viewer-annotated">
+                          {annotatedParagraphs.map((row) => (
+                            <div key={row.id} className="viewer-para-row">
+                              <div className="viewer-gutter">
+                                {row.pills.map((p) => (
+                                  <button
+                                    key={p.rank}
+                                    type="button"
+                                    className="viewer-margin-pill"
+                                    style={{ backgroundColor: p.color }}
+                                    title={`Sumber #${p.rank}`}
+                                    onClick={() => {
+                                      const src = report.sources.find((s) => s.rank === p.rank);
+                                      if (src) {
+                                        setSelectedSourceRank(src.rank);
+                                        if (p.firstMatchId) setActiveMatchId(p.firstMatchId);
+                                        loadSourceById(src.source_document_id);
+                                      }
+                                    }}
+                                  >
+                                    {p.rank}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="viewer-para-text">
+                                {row.chunks.map((seg, idx) => {
+                                  if (seg.category === "PLAIN") {
+                                    return <span key={idx}>{seg.text}</span>;
+                                  }
+                                  if (seg.category === "EXCLUDED") {
+                                    return (
+                                      <span
+                                        key={idx}
+                                        className="hl-seg hl-EXCLUDED"
+                                        title={`Dikecualikan: ${seg.excluded_reason || "aturan pengecualian"}`}
+                                      >
+                                        {seg.text}
+                                      </span>
+                                    );
+                                  }
+                                  const isDimmed =
+                                    selectedSourceRank !== null &&
+                                    seg.source_rank !== null &&
+                                    seg.source_rank !== selectedSourceRank;
+                                  const srcHex = pillColor(seg.source_rank, seg.source_color);
+                                  return (
+                                    <span
+                                      key={idx}
+                                      onClick={() => handleSelectSegment(seg.match_ids, seg.source_rank)}
+                                      className={`hl-seg hl-source-tinted ${
+                                        activeMatchId && seg.match_ids.includes(activeMatchId) ? "hl-active" : ""
+                                      } ${isDimmed ? "opacity-35" : ""}`}
+                                      style={{ ["--src-color" as any]: srcHex }}
+                                      title={`${seg.source_rank ? `Sumber #${seg.source_rank} · ` : ""}${
+                                        LAYER_LABELS[seg.category] || seg.category
+                                      }`}
+                                    >
+                                      {seg.text}
+                                    </span>
+                                  );
+                                })}
+                              </p>
+                            </div>
+                          ))}
                         </div>
                       </CardContent>
                     </Card>
@@ -466,18 +976,13 @@ export const ReportDetailPage: React.FC = () => {
                             value={sourceViewer?.source_document_id || ""}
                             onChange={async (e) => {
                               const sid = e.target.value;
-                              if (!sid || !checkId) return;
-                              try {
-                                const sv = await apiFetch<SourceViewerPayload>(`/checks/${checkId}/sources/${sid}/viewer`);
-                                setSourceViewer(sv);
-                              } catch {
-                                // ignore
-                              }
+                              if (!sid) return;
+                              await loadSourceById(sid);
                             }}
                           >
                             {report.sources.map((s) => (
                               <option key={s.source_document_id} value={s.source_document_id}>
-                                #{s.rank} — {s.title} ({s.contribution_pct.toFixed(1)}%)
+                                #{s.rank} — {s.title} ({formatContributionPct(s.contribution_pct)})
                               </option>
                             ))}
                           </select>
@@ -485,9 +990,7 @@ export const ReportDetailPage: React.FC = () => {
                       </CardHeader>
                       <CardContent>
                         {sourceViewer ? (
-                          <div className="viewer-pane">
-                            {sourceViewer.text}
-                          </div>
+                          <div className="viewer-pane">{renderedSourceText}</div>
                         ) : (
                           <div className="flex h-[540px] items-center justify-center rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                             Tidak ada sumber berteks lengkap yang cocok untuk ditampilkan.
@@ -508,7 +1011,7 @@ export const ReportDetailPage: React.FC = () => {
                   <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-base">Daftar Bukti Kecocokan</CardTitle>
-                      <CardDescription>Klik tombol detail pada baris mana pun untuk memeriksa perbandingan lengkap.</CardDescription>
+                      <CardDescription>Klik tombol rincian pada baris mana pun untuk memeriksa perbandingan lengkap.</CardDescription>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {["ALL", "EXACT", "NEAR_EXACT", "LEXICAL", "SEMANTIC"].map((layerKey) => (
@@ -532,8 +1035,8 @@ export const ReportDetailPage: React.FC = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Jenis</TableHead>
                             <TableHead>Sumber</TableHead>
+                            <TableHead>Jenis</TableHead>
                             <TableHead>Cuplikan Naskah</TableHead>
                             <TableHead className="text-right">Kata</TableHead>
                             <TableHead className="text-right">Bukti</TableHead>
@@ -549,10 +1052,22 @@ export const ReportDetailPage: React.FC = () => {
                           ) : (
                             pagedMatches.map((m) => (
                               <TableRow key={m.id}>
+                                <TableCell className="max-w-[230px]">
+                                  <div className="flex items-center gap-2">
+                                    {m.source_rank ? (
+                                      <span
+                                        className="source-rank-pill shrink-0"
+                                        style={{ backgroundColor: pillColor(m.source_rank, m.source_color) }}
+                                      >
+                                        {m.source_rank}
+                                      </span>
+                                    ) : null}
+                                    <span className="truncate font-medium text-foreground">{m.source_title}</span>
+                                  </div>
+                                </TableCell>
                                 <TableCell>
                                   <Badge variant="outline">{LAYER_LABELS[m.layer] || m.layer}</Badge>
                                 </TableCell>
-                                <TableCell className="max-w-[200px] truncate font-medium">{m.source_title}</TableCell>
                                 <TableCell className="max-w-[320px] truncate text-xs text-muted-foreground">
                                   {m.sub_excerpt}
                                 </TableCell>
@@ -601,10 +1116,11 @@ export const ReportDetailPage: React.FC = () => {
                 </Card>
               </TabsContent>
 
+              {/* ================== FULL COLORED SOURCES TAB ================== */}
               <TabsContent value="sources" className="mt-4 flex flex-col gap-4">
                 <Card className="shadow-none">
                   <CardHeader>
-                    <CardTitle className="text-base">Daftar Sumber yang Cocok</CardTitle>
+                    <CardTitle className="text-base">Daftar Lengkap Sumber yang Cocok</CardTitle>
                     <CardDescription>
                       Kontribusi dihitung secara eksklusif agar satu kalimat tidak pernah dihitung ganda.
                     </CardDescription>
@@ -614,11 +1130,11 @@ export const ReportDetailPage: React.FC = () => {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>#</TableHead>
+                            <TableHead className="w-12">#</TableHead>
                             <TableHead>Judul Sumber &amp; Referensi</TableHead>
-                            <TableHead>Tipe</TableHead>
+                            <TableHead>Kategori</TableHead>
                             <TableHead className="text-right">Kata Cocok</TableHead>
-                            <TableHead className="text-right">Kontribusi Sumber</TableHead>
+                            <TableHead className="text-right">Kontribusi</TableHead>
                             <TableHead className="text-right">Akses</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -632,9 +1148,22 @@ export const ReportDetailPage: React.FC = () => {
                           ) : (
                             report.sources.map((src: ReportSource) => (
                               <TableRow key={src.source_document_id}>
-                                <TableCell className="tabular-nums">{src.rank}</TableCell>
-                                <TableCell className="max-w-[340px]">
-                                  <div className="font-medium text-foreground">{src.title}</div>
+                                <TableCell>
+                                  <span
+                                    className="source-rank-pill"
+                                    style={{ backgroundColor: pillColor(src.rank, src.color_hex) }}
+                                  >
+                                    {src.rank}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="max-w-[360px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleJumpToSource(src)}
+                                    className="text-left font-medium text-foreground hover:text-primary hover:underline"
+                                  >
+                                    {src.title}
+                                  </button>
                                   <div className="text-xs text-muted-foreground">
                                     {src.authors?.join(", ") || "Penulis tidak tercantum"}
                                     {src.year ? ` (${src.year})` : ""}
@@ -642,11 +1171,19 @@ export const ReportDetailPage: React.FC = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge variant="secondary">{src.source_type}</Badge>
+                                  <span
+                                    className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium"
+                                    style={{
+                                      backgroundColor: src.chip_bg_hex || "var(--muted)",
+                                      color: src.chip_text_hex || "var(--foreground)",
+                                    }}
+                                  >
+                                    {src.category_label || src.source_type}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">{src.matched_words_exclusive}</TableCell>
-                                <TableCell className="text-right font-semibold tabular-nums">
-                                  {src.contribution_pct.toFixed(1)}%
+                                <TableCell className="text-right font-serif font-bold tabular-nums">
+                                  {formatContributionPct(src.contribution_pct)}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-1">
@@ -662,7 +1199,9 @@ export const ReportDetailPage: React.FC = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => downloadProtectedFile(`/documents/${src.source_document_id}/file`, src.filename)}
+                                        onClick={() =>
+                                          downloadProtectedFile(`/documents/${src.source_document_id}/file`, src.filename)
+                                        }
                                       >
                                         <Download className="size-3.5" />
                                       </Button>
@@ -688,10 +1227,15 @@ export const ReportDetailPage: React.FC = () => {
                     </CardHeader>
                     <CardContent className="flex flex-col gap-2">
                       {report.coverage.metadata_only_items.slice(0, 10).map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-xs">
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-xs"
+                        >
                           <div className="min-w-0">
                             <p className="truncate font-medium text-foreground">{item.title}</p>
-                            <p className="text-muted-foreground">{item.provider} · {item.access_status}</p>
+                            <p className="text-muted-foreground">
+                              {item.provider} · {item.access_status}
+                            </p>
                           </div>
                           {item.url && (
                             <Button size="sm" variant="ghost" asChild>
@@ -719,25 +1263,25 @@ export const ReportDetailPage: React.FC = () => {
                   <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div className="rounded-md border border-border p-3">
                       <span className="text-xs text-muted-foreground">Kueri Pencarian</span>
-                      <p className="mt-1 text-xl font-bold tabular-nums">
+                      <p className="mt-1 font-serif text-xl font-bold tabular-nums">
                         {report.coverage?.search_coverage?.total_search_queries ?? report.provider_queries.length}
                       </p>
                     </div>
                     <div className="rounded-md border border-border p-3">
                       <span className="text-xs text-muted-foreground">Tautan Unik Ditemukan</span>
-                      <p className="mt-1 text-xl font-bold tabular-nums">
+                      <p className="mt-1 font-serif text-xl font-bold tabular-nums">
                         {report.coverage?.search_coverage?.total_unique_urls_found ?? 0}
                       </p>
                     </div>
                     <div className="rounded-md border border-border p-3">
                       <span className="text-xs text-muted-foreground">Dokumen Diunduh</span>
-                      <p className="mt-1 text-xl font-bold tabular-nums">
+                      <p className="mt-1 font-serif text-xl font-bold tabular-nums">
                         {report.coverage?.search_coverage?.total_fulltext_fetched ?? 0}
                       </p>
                     </div>
                     <div className="rounded-md border border-border p-3">
                       <span className="text-xs text-muted-foreground">Tidak Dapat Diakses</span>
-                      <p className="mt-1 text-xl font-bold tabular-nums">
+                      <p className="mt-1 font-serif text-xl font-bold tabular-nums">
                         {report.coverage?.search_coverage?.total_inaccessible_sources ?? 0}
                       </p>
                     </div>
@@ -765,7 +1309,9 @@ export const ReportDetailPage: React.FC = () => {
                             <TableRow key={i}>
                               <TableCell className="font-medium">{q.provider}</TableCell>
                               <TableCell className="max-w-[340px] truncate text-xs text-muted-foreground">{q.query}</TableCell>
-                              <TableCell><Badge variant="secondary">{q.status}</Badge></TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{q.status}</Badge>
+                              </TableCell>
                               <TableCell className="text-right tabular-nums">{q.result_count}</TableCell>
                               <TableCell className="text-right tabular-nums text-xs">{formatMs(q.duration_ms)}</TableCell>
                             </TableRow>
@@ -895,7 +1441,6 @@ export const ReportDetailPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Signals & Paragraph Highlights */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card className="shadow-none lg:col-span-2">
                 <CardHeader>
@@ -1000,7 +1545,17 @@ export const ReportDetailPage: React.FC = () => {
         <Dialog open={Boolean(selectedEvidence)} onOpenChange={(open) => !open && setSelectedEvidence(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Rincian Kecocokan Teks</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedEvidence?.source_rank ? (
+                  <span
+                    className="source-rank-pill"
+                    style={{ backgroundColor: pillColor(selectedEvidence.source_rank, selectedEvidence.source_color) }}
+                  >
+                    {selectedEvidence.source_rank}
+                  </span>
+                ) : null}
+                <span>Rincian Kecocokan Teks</span>
+              </DialogTitle>
               <DialogDescription>
                 {selectedEvidence?.source_title} ({selectedEvidence ? LAYER_LABELS[selectedEvidence.layer] : ""})
               </DialogDescription>

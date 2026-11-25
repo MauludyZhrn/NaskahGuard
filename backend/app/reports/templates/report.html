@@ -3,178 +3,231 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Laporan Kemiripan {{ report.report_number }} — {{ report.app_name }}</title>
+  <title>Laporan Integritas {{ report.report_number }} — {{ report.app_name }}</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #fffff8; color: #111827; margin: 0; padding: 32px; line-height: 1.55; }
-    .container { max-width: 980px; margin: 0 auto; }
-    header { border-bottom: 2px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
-    h1 { margin: 0; font-size: 24px; font-family: Georgia, serif; }
-    .meta { font-size: 13px; color: #4b5563; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-    .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
-    .card .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
-    .card .val { font-size: 24px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .section { margin-bottom: 28px; }
-    h2 { font-size: 17px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: Georgia, serif; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; }
-    th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
-    th { background: #f8fafc; font-weight: 600; }
-    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-    .notice { background: #f8fafc; border-left: 4px solid #2563eb; padding: 12px 14px; font-size: 13px; margin: 12px 0; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .badge-EXACT { background: #fee2e2; color: #991b1b; }
-    .badge-NEAR_EXACT { background: #ffedd5; color: #9a3412; }
-    .badge-LEXICAL { background: #fef9c3; color: #854d0e; }
-    .badge-SEMANTIC { background: #dbeafe; color: #1e40af; }
-    .excerpt { font-size: 12px; color: #374151; background: #f9fafb; padding: 6px 8px; border-radius: 4px; }
+    :root {
+      --bg: #f8f5f0;
+      --paper: #fffdfb;
+      --sand: #f3ece4;
+      --border: #e0d7cb;
+      --ink: #1b1416;
+      --muted: #5e544f;
+      --taupe: #9a8f89;
+      --burgundy: #6e1f2f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 20px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .sheet {
+      max-width: 880px;
+      margin: 0 auto 28px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px 44px;
+      box-shadow: 0 2px 10px rgba(27, 20, 22, 0.04);
+    }
+    .running-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11.5px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 28px;
+    }
+    .brand { font-weight: 700; color: var(--burgundy); font-size: 13px; }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--burgundy); text-transform: uppercase; margin-bottom: 8px; }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-size: 26px; line-height: 1.25; margin: 0 0 10px; }
+    h2 { font-family: Georgia, "Times New Roman", serif; font-size: 17px; margin: 22px 0 10px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .muted { color: var(--muted); font-size: 13px; }
+    .cover-grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 24px; margin-top: 16px; align-items: start; }
+    .detail-item { margin-bottom: 10px; }
+    .detail-label { font-size: 11px; color: var(--taupe); }
+    .detail-val { font-size: 13.5px; font-weight: 600; }
+    .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; font-weight: 700; font-size: 14.5px; line-height: 2; }
+    .hero-score { font-family: Georgia, serif; font-size: 36px; font-weight: 700; color: var(--burgundy); margin: 0; }
+    .hero-label { font-size: 22px; font-weight: 700; color: var(--ink); margin-left: 10px; }
+    .cat-list { list-style: none; padding: 0; margin: 8px 0 0; }
+    .cat-list li { display: flex; gap: 16px; padding: 4px 0; font-size: 13.5px; }
+    .cat-pct { width: 52px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .flags-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start; }
+    .callout { background: var(--sand); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 12.5px; color: var(--muted); }
+    .source-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding: 12px 0; border-bottom: 1px solid #ece4da; }
+    .pill-line { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .rank-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 18px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; padding: 0 7px; }
+    .cat-chip { display: inline-flex; align-items: center; height: 18px; border-radius: 999px; font-size: 11px; font-weight: 600; padding: 0 9px; }
+    .src-title { font-weight: 600; font-size: 13.5px; }
+    .src-pct { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .annotated-para { display: grid; grid-template-columns: 36px 1fr; gap: 14px; margin-bottom: 14px; align-items: start; }
+    .gutter { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+    .doc-text { font-family: Georgia, "Times New Roman", serif; font-size: 14.5px; line-height: 1.75; white-space: pre-wrap; }
+    .hl-excl { color: var(--taupe); }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { box-shadow: none; border: none; page-break-after: always; padding: 24px; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
+  <!-- Halaman 1: Sampul Laporan -->
+  <section class="sheet">
+    <div class="running-bar">
+      <div><span class="brand">{{ report.app_name }}</span> &nbsp;·&nbsp; Sampul Laporan</div>
+      <div>No. Laporan {{ report.report_number }}</div>
+    </div>
+    <div class="eyebrow">Laporan Pemeriksaan Integritas Naskah</div>
+    <h1>{{ report.document.title }}</h1>
+    <p class="muted">Mode: {{ report.mode or "PLAGIARISM_ONLY" }} · Platform Lokal {{ report.app_name }}</p>
+
+    <h2>Detail Dokumen</h2>
+    <div class="cover-grid">
       <div>
-        <h1>{{ report.app_name }} — Laporan Pemeriksaan Kemiripan</h1>
-        <div class="meta">Nomor Laporan: <strong>{{ report.report_number }}</strong> · Waktu Selesai: {{ report.finished_at or report.created_at }}</div>
+        <div class="detail-item"><div class="detail-label">Nomor Laporan</div><div class="detail-val">{{ report.report_number }}</div></div>
+        <div class="detail-item"><div class="detail-label">Tanggal Pemeriksaan</div><div class="detail-val">{{ report.finished_at or report.created_at }}</div></div>
+        <div class="detail-item"><div class="detail-label">Tanggal Unduh</div><div class="detail-val">{{ download_date }}</div></div>
+        <div class="detail-item"><div class="detail-label">Nama Berkas</div><div class="detail-val">{{ report.document.filename }}</div></div>
+        <div class="detail-item"><div class="detail-label">Ukuran Berkas</div><div class="detail-val">{{ file_size_label }}</div></div>
       </div>
-      <div class="meta">
-        Dokumen: <strong>{{ report.document.filename }}</strong> ({{ report.document.file_type | upper }}, {{ report.document.page_count }} hlm)
-      </div>
-    </header>
-
-    <div class="grid">
-      <div class="card">
-        <div class="label">Similarity Index (Adjusted)</div>
-        <div class="val">{{ "%.2f"|format(report.metrics.get("similarity_index", 0)) }}%</div>
-      </div>
-      <div class="card">
-        <div class="label">Raw Similarity</div>
-        <div class="val">{{ "%.2f"|format(report.metrics.get("raw_similarity", 0)) }}%</div>
-      </div>
-      <div class="card">
-        <div class="label">Kata Cocok / Diperiksa</div>
-        <div class="val">{{ report.metrics.get("matched_words", 0) }} / {{ report.metrics.get("eligible_words", 0) }}</div>
-      </div>
-      <div class="card">
-        <div class="label">Sumber Berkontribusi</div>
-        <div class="val">{{ report.metrics.get("sources_found", 0) }}</div>
+      <div class="stat-card">
+        <div>{{ report.document.page_count }} Halaman</div>
+        <div>{{ "{:,}".format(report.document.word_count) }} Kata</div>
+        <div>{{ "{:,}".format(report.document.character_count or 0) }} Karakter</div>
       </div>
     </div>
+  </section>
 
-    <div class="notice">
-      <strong>Kategori Operasional: {{ report.metrics.get("operational_category", {}).get("level", "-") }}</strong> —
-      {{ report.metrics.get("operational_category", {}).get("disclaimer", "") }}
+  <!-- Halaman 2: Ringkasan Integritas -->
+  <section class="sheet">
+    <div class="running-bar">
+      <div><span class="brand">{{ report.app_name }}</span> &nbsp;·&nbsp; Ringkasan Integritas</div>
+      <div>No. Laporan {{ report.report_number }}</div>
     </div>
 
-    <div class="section">
-      <h2>Metodologi &amp; Rincian Persentase</h2>
-      <p style="font-size: 13px;">Rumus utama: <code>SI = (Unique Matched Eligible Words / Total Eligible Words) × 100%</code>. Kata yang bertumpuk antar sumber hanya dihitung satu kali dengan atribusi eksklusif.</p>
-      {{ layer_svg | safe }}
+    {% if report.mode != "AI_ONLY" %}
+    <div>
+      <span class="hero-score">{{ "%.1f"|format(report.metrics.get("similarity_index", 0)) }}%</span>
+      <span class="hero-label">Kemiripan Keseluruhan</span>
+    </div>
+    <p class="muted">Total gabungan kecocokan unik: {{ report.metrics.get("matched_words", 0) }} dari {{ report.metrics.get("eligible_words", 0) }} kata yang diperiksa tanpa penghitungan ganda.</p>
+
+    <h2>Bagian yang Dikecualikan</h2>
+    {% if report.active_filters %}
       <ul>
-        <li>Exact Match: <strong>{{ "%.2f"|format(report.metrics.get("exact_match_pct", 0)) }}%</strong></li>
-        <li>Near-Exact Match: <strong>{{ "%.2f"|format(report.metrics.get("near_exact_match_pct", 0)) }}%</strong></li>
-        <li>Lexical Match ({{ "masuk skor" if report.metrics.get("include_lexical_in_index") else "kandidat di luar skor utama" }}): <strong>{{ "%.2f"|format(report.metrics.get("lexical_match_pct", 0)) }}%</strong></li>
-        <li>Kandidat Semantik (tinjauan saja): <strong>{{ report.metrics.get("semantic_candidates_count", 0) }}</strong> segmen ({{ report.metrics.get("semantic_status", "-") }})</li>
+        {% for f in report.active_filters %}<li>{{ f }}</li>{% endfor %}
       </ul>
-    </div>
-
-    <div class="section">
-      <h2>Top Sumber &amp; Daftar Sumber Cocok</h2>
-      {{ sources_svg | safe }}
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Sumber</th>
-            <th>Tipe &amp; Status</th>
-            <th class="num">Kata Cocok (Eksklusif)</th>
-            <th class="num">Kontribusi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for src in report.sources %}
-          <tr>
-            <td>{{ src.rank }}</td>
-            <td>
-              <strong>{{ src.title }}</strong><br/>
-              <span class="meta">{{ src.authors | join(", ") }}{% if src.year %} ({{ src.year }}){% endif %}{% if src.doi %} · DOI: {{ src.doi }}{% endif %}</span>
-            </td>
-            <td>{{ src.source_type }}<br/><span class="meta">{{ src.access_status }}</span></td>
-            <td class="num">{{ src.matched_words_exclusive }}</td>
-            <td class="num">{{ "%.2f"|format(src.contribution_pct) }}%</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="5">Tidak ada sumber yang cocok.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section">
-      <h2>Alur Pemeriksaan (Data Aktual)</h2>
-      <table>
-        <thead>
-          <tr><th>Tahap</th><th>Ringkasan Data Aktual</th></tr>
-        </thead>
-        <tbody>
-          {% for key, val in report.stage_counts.items() %}
-          <tr><td><strong>{{ key }}</strong></td><td><code>{{ val }}</code></td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="section">
-      <h2>Contoh Kecocokan Teks (Maks. 20 Passage)</h2>
-      <table>
-        <thead>
-          <tr><th>Lapisan</th><th>Sumber</th><th>Cuplikan Dokumen</th><th>Cuplikan Sumber</th><th class="num">Kata</th></tr>
-        </thead>
-        <tbody>
-          {% for m in report.matches[:20] %}
-          <tr>
-            <td><span class="badge badge-{{ m.layer }}">{{ m.layer }}</span>{% if m.excluded_reason %}<br/><span class="meta">Dikecualikan: {{ m.excluded_reason }}</span>{% endif %}</td>
-            <td>{{ m.source_title }}{% if m.src_page %}<br/><span class="meta">Hlm. {{ m.src_page }}</span>{% endif %}</td>
-            <td><div class="excerpt">{{ m.sub_excerpt }}</div></td>
-            <td><div class="excerpt">{{ m.src_excerpt }}</div></td>
-            <td class="num">{{ m.matched_words }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="5">Tidak ada kecocokan teks yang tercatat.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    {% if report.ai_report %}
-    <div class="section">
-      <h2>Bagian Deteksi Pola Tulisan AI (Terpisah dari Plagiasi)</h2>
-      <div class="notice">
-        <p>
-          <strong>Klasifikasi: {{ report.ai_report.classification_label }}</strong>
-          {% if report.ai_report.ai_likelihood_pct is not none %}
-            — Indikasi Pola AI: <strong>{{ "%.1f"|format(report.ai_report.ai_likelihood_pct) }}%</strong>
-          {% endif %}
-          (Keyakinan: {{ report.ai_report.confidence_label }})
-        </p>
-        <p>{{ report.ai_report.summary_id }}</p>
-        <p class="meta">{{ report.ai_report.disclaimer }}</p>
-      </div>
-    </div>
+    {% else %}
+      <p class="muted">Tidak ada bagian yang dikecualikan.</p>
     {% endif %}
 
-    <div class="section">
-      <h2>Pernyataan Cakupan &amp; Keterbatasan Sistem</h2>
-      <div class="notice">
-        <p><strong>{{ report.coverage.get("statement", "") }}</strong></p>
-        <ul>
-          {% for note in report.coverage.get("notes", []) %}
-          <li>{{ note }}</li>
+    <h2>Ringkasan Sumber per Kategori</h2>
+    <ul class="cat-list">
+      <li><span class="cat-pct">{{ "%.1f"|format(report.source_categories.internet_pct) }}%</span><span>Sumber Internet &amp; Halaman Web</span></li>
+      <li><span class="cat-pct">{{ "%.1f"|format(report.source_categories.publication_pct) }}%</span><span>Publikasi Ilmiah &amp; Jurnal Terbuka</span></li>
+      <li><span class="cat-pct">{{ "%.1f"|format(report.source_categories.local_pct) }}%</span><span>Korpus Lokal &amp; Repositori Institusi</span></li>
+    </ul>
+    {% endif %}
+
+    <h2>Tanda Integritas</h2>
+    <div class="flags-grid">
+      <div>
+        {% if report.integrity_flags %}
+          <p><strong>{{ report.integrity_flags | length }} Tanda Integritas untuk Ditinjau</strong></p>
+          {% for fl in report.integrity_flags %}
+            <p><strong>{{ fl.title }}</strong><br/><span class="muted">{{ fl.summary }} {{ fl.detail }}</span></p>
           {% endfor %}
-          <li>NaskahGuard bukan pengganti Turnitin/iThenticate dan tidak mengklaim memiliki akses ke basis data tertutup penerbit/institusi.</li>
-          <li>Dokumen pindaian bergantung pada ketersediaan OCR lokal (metode ekstraksi: {{ report.document.extraction_method }}, keyakinan: {{ "%.0f"|format(report.document.extraction_confidence * 100) }}%).</li>
-        </ul>
+        {% else %}
+          <p><strong>0 Anomali Karakter Terdeteksi</strong><br/><span class="muted">Tidak ditemukan karakter pengganti (homoglyph) atau karakter tak terlihat pada teks Latin.</span></p>
+        {% endif %}
+      </div>
+      <div class="callout">
+        Algoritma NaskahGuard memeriksa konsistensi naskah secara lokal. Tanda integritas maupun skor kemiripan bukan bukti otomatis pelanggaran akademik, melainkan panduan peninjauan manusia.
       </div>
     </div>
-  </div>
+  </section>
+
+  {% if report.mode != "AI_ONLY" and report.sources %}
+  <!-- Halaman 3: Daftar Sumber Utama Berwarna -->
+  <section class="sheet">
+    <div class="running-bar">
+      <div><span class="brand">{{ report.app_name }}</span> &nbsp;·&nbsp; Daftar Sumber Utama</div>
+      <div>No. Laporan {{ report.report_number }}</div>
+    </div>
+    <h1 style="font-size: 20px;">Daftar Sumber Utama</h1>
+    <p class="muted">Sumber dengan kecocokan terbanyak dalam naskah. Setiap bagian yang tumpang tindih hanya diatribusikan ke satu sumber utama.</p>
+    {% for src in report.sources %}
+    <div class="source-row">
+      <div>
+        <div class="pill-line">
+          <span class="rank-pill" style="background: {{ src.color_hex or '#6E1F2F' }}">{{ src.rank }}</span>
+          <span class="cat-chip" style="background: {{ src.chip_bg_hex or '#EDE6DD' }}; color: {{ src.chip_text_hex or '#1B1416' }}">{{ src.category_label or src.source_type }}</span>
+        </div>
+        <div class="src-title">{{ src.title }}</div>
+        {% if src.authors or src.year or src.doi %}
+          <div class="muted">{{ src.authors | join(", ") }}{% if src.year %} ({{ src.year }}){% endif %}{% if src.doi %} · DOI: {{ src.doi }}{% endif %}</div>
+        {% endif %}
+      </div>
+      <div class="src-pct">{{ format_pct(src.contribution_pct) }}</div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if report.ai_report %}
+  <!-- Bagian Terpisah: Deteksi Pola Tulisan AI -->
+  <section class="sheet">
+    <div class="running-bar">
+      <div><span class="brand">{{ report.app_name }}</span> &nbsp;·&nbsp; Bagian Deteksi Pola Tulisan AI (Terpisah dari Plagiasi)</div>
+      <div>No. Laporan {{ report.report_number }}</div>
+    </div>
+    <div class="eyebrow">Deteksi Pola Tulisan AI (Terpisah dari Plagiasi)</div>
+    <div>
+      <span class="hero-score">{% if report.ai_report.ai_likelihood_pct is not none %}{{ "%.1f"|format(report.ai_report.ai_likelihood_pct) }}%{% else %}Kurang Bukti{% endif %}</span>
+      <span class="hero-label">{{ report.ai_report.classification_label }}</span>
+    </div>
+    <p>{{ report.ai_report.summary_id }}</p>
+    <div class="callout">{{ report.ai_report.disclaimer }}</div>
+  </section>
+  {% endif %}
+
+  {% if annotated_paragraphs and report.mode != "AI_ONLY" %}
+  <!-- Naskah Berpenanda Margin -->
+  <section class="sheet">
+    <div class="running-bar">
+      <div><span class="brand">{{ report.app_name }}</span> &nbsp;·&nbsp; Naskah Berpenanda</div>
+      <div>No. Laporan {{ report.report_number }}</div>
+    </div>
+    <h1 style="font-size: 20px;">Naskah Lengkap dengan Penanda Sumber</h1>
+    <p class="muted" style="margin-bottom: 20px;">Nomor berwarna di margin kiri merujuk langsung pada peringkat sumber di Daftar Sumber Utama.</p>
+    {% for para in annotated_paragraphs %}
+    <div class="annotated-para">
+      <div class="gutter">
+        {% for b in para.badges %}
+          <span class="rank-pill" style="background: {{ b.color }}; min-width: 24px;">{{ b.rank }}</span>
+        {% endfor %}
+      </div>
+      <div class="doc-text">
+        {%- for seg in para.segments -%}
+          {%- if seg.category not in ['PLAIN', 'EXCLUDED'] and seg.source_highlight -%}
+            <mark style="background: {{ seg.source_highlight }}; padding: 1px 2px; border-radius: 3px;">{{ seg.text }}</mark>
+          {%- elif seg.category == 'EXCLUDED' -%}
+            <span class="hl-excl">{{ seg.text }}</span>
+          {%- else -%}
+            {{ seg.text }}
+          {%- endif -%}
+        {%- endfor -%}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
 </body>
 </html>

@@ -55,7 +55,11 @@ def export_report_html(
     db: Session = Depends(get_db),
 ) -> Response:
     report = build_full_report(db, check_id)
-    data = render_html_bytes(report)
+    try:
+        viewer = build_viewer_payload(db, check_id)
+    except Exception:
+        viewer = None
+    data = render_html_bytes(report, viewer=viewer)
     rnum = report["report_number"]
     log_audit(db, actor=actor, action="EXPORT_HTML", target_type="check", target_id=check_id)
     return Response(
@@ -72,7 +76,11 @@ def export_report_pdf(
     db: Session = Depends(get_db),
 ) -> Response:
     report = build_full_report(db, check_id)
-    data = render_pdf_bytes(report)
+    try:
+        viewer = build_viewer_payload(db, check_id)
+    except Exception:
+        viewer = None
+    data = render_pdf_bytes(report, viewer=viewer)
     rnum = report["report_number"]
     log_audit(db, actor=actor, action="EXPORT_PDF", target_type="check", target_id=check_id)
     return Response(

@@ -78,7 +78,7 @@
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/reports/e628cc0d-e761-43e2-8662-010770ed78b2",
+      "route": "/reports/248fe3db-bc18-4433-b6d0-eb5a1ccf66d1",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true
@@ -146,6 +146,7 @@
     "17_dashboard_dark.png",
     "18_tablet_new_check.png",
     "19_mobile_new_check.png",
-    "20_dashboard_dark_collapsed.png"
+    "20_dashboard_dark_collapsed.png",
+    "21_report_detail_annotated_text.png"
   ]
 }

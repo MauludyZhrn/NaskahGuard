@@ -207,7 +207,7 @@ def main() -> int:
                     ("/corpus", "08_corpus.png", "Korpus Sumber"),
                     ("/discovery-monitor", "09_discovery_monitor.png", "Monitor Penemuan"),
                     ("/repositories", "10_repositories.png", "Repositori Akademik"),
-                    (f"/reports/{comb_id}", "11_report_detail_plagiarism.png", "Ringkasan Hasil"),
+                    (f"/reports/{comb_id}", "11_report_detail_plagiarism.png", "Kemiripan Keseluruhan"),
                     ("/analytics", "12_analytics.png", "Analitik"),
                     ("/analytics/ai", "13_analytics_ai.png", "Analitik Deteksi Tulisan AI"),
                     ("/settings", "14_settings.png", "Pengaturan Aplikasi"),
@@ -229,9 +229,16 @@ def main() -> int:
                     })
                     page.screenshot(path=str(SCREENSHOT_DIR / fname), full_page=False)
 
-                # Switch Combined Report to AI tab & capture separate AI report view
+                # Capture annotated manuscript tab with left-margin colored pills
                 page.goto(f"{base_url}/reports/{comb_id}", wait_until="networkidle")
-                page.wait_for_timeout(250)
+                page.wait_for_timeout(300)
+                compare_tab = page.get_by_role("tab", name="Naskah Berpenanda")
+                if compare_tab.count() > 0:
+                    compare_tab.first.click()
+                    page.wait_for_timeout(350)
+                page.screenshot(path=str(SCREENSHOT_DIR / "21_report_detail_annotated_text.png"), full_page=False)
+
+                # Switch Combined Report to AI tab & capture separate AI report view
                 ai_tab_btn = page.get_by_role("button", name="Laporan Deteksi AI")
                 if ai_tab_btn.count() > 0:
                     ai_tab_btn.first.click()

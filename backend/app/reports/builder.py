@@ -12,6 +12,13 @@ from app.config import get_settings
 from app.engine.exclusions import build_exclusion_mask
 from app.ingestion.service import load_extracted_payload
 from app.models import Check, CheckSource, Document, Match, ProviderQuery, Segment, SourceAcquisition
+from app.reports.integrity_flags import (
+    classify_source_category,
+    color_for_rank,
+    compute_source_category_summary,
+    detect_integrity_flags,
+    extract_active_filters,
+)
 from app.schemas import CheckSettingsSchema
 
 LAYER_PRIORITY = {
@@ -70,7 +77,13 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
             doc_map[extra_doc.id] = extra_doc
 
     sources_out = []
+    rank_by_source_id: dict[str, int] = {}
+    color_by_source_id: dict[str, dict[str, str]] = {}
     for cs, sdoc in sources_rows:
+        palette = color_for_rank(cs.rank)
+        cat_key, cat_label = classify_source_category(sdoc.source_type, sdoc.provider)
+        rank_by_source_id[sdoc.id] = cs.rank
+        color_by_source_id[sdoc.id] = palette
         sources_out.append(
             {
                 "rank": cs.rank,
@@ -86,6 +99,12 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
                 "license": sdoc.license,
                 "indexing_status": sdoc.indexing_status,
                 "source_type": sdoc.source_type,
+                "category_key": cat_key,
+                "category_label": cat_label,
+                "color_hex": palette["badge"],
+                "highlight_hex": palette["highlight"],
+                "chip_bg_hex": palette["chip_bg"],
+                "chip_text_hex": palette["chip_text"],
                 "access_status": sdoc.access_status,
                 "provider": sdoc.provider or "local_corpus",
                 "matched_words_exclusive": cs.matched_words_exclusive,
@@ -99,10 +118,15 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
     matches_out = []
     for m in matches:
         sdoc = doc_map.get(m.source_document_id)
+        s_rank = rank_by_source_id.get(m.source_document_id)
+        s_pal = color_by_source_id.get(m.source_document_id)
         matches_out.append(
             {
                 "id": m.id,
                 "source_document_id": m.source_document_id,
+                "source_rank": s_rank,
+                "source_color": s_pal["badge"] if s_pal else None,
+                "source_highlight": s_pal["highlight"] if s_pal else None,
                 "source_title": (sdoc.title or sdoc.filename) if sdoc else "Sumber",
                 "layer": m.layer,
                 "sub_token_start": m.sub_token_start,
@@ -206,6 +230,18 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
         + (f" serta {len(ai_rep.get('highlights', []))} paragraf terindikasi pola AI." if ai_rep and ai_rep.get("highlights") else ".")
     )
 
+    try:
+        ext_payload = load_extracted_payload(doc.id)
+        raw_text = str(ext_payload.get("text") or "")
+        raw_pages = ext_payload.get("pages") or []
+    except Exception:
+        raw_text = ""
+        raw_pages = []
+
+    integrity_flags = detect_integrity_flags(raw_text, raw_pages)
+    source_categories = compute_source_category_summary(sources_out)
+    active_filters = extract_active_filters(check.settings)
+
     return {
         "app_name": settings.APP_NAME,
         "check_id": check.id,
@@ -220,17 +256,24 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
         "document": {
             "id": doc.id,
             "filename": doc.filename,
+            "stored_name": doc.stored_name,
             "title": doc.title or doc.filename,
+            "authors": doc.authors or [],
             "file_type": doc.file_type,
+            "size_bytes": doc.size_bytes,
             "language": doc.language,
             "page_count": doc.page_count,
             "word_count": doc.word_count,
+            "character_count": len(raw_text),
             "extraction_method": doc.extraction_method,
             "extraction_confidence": doc.extraction_confidence,
             "ocr_pages": doc.ocr_pages or [],
             "extra": doc.extra or {},
         },
         "settings": check.settings or {},
+        "active_filters": active_filters,
+        "source_categories": source_categories,
+        "integrity_flags": integrity_flags,
         "metrics": metrics,
         "coverage": coverage,
         "ai_report": ai_rep,
@@ -305,6 +348,9 @@ def build_viewer_payload(db: Session, check_id: str) -> dict[str, Any]:
         .all()
     )
     matches = db.query(Match).filter(Match.check_id == check.id).all()
+    check_sources = db.query(CheckSource).filter(CheckSource.check_id == check.id).all()
+    rank_map = {cs.source_document_id: cs.rank for cs in check_sources}
+    match_rank_map = {m.id: rank_map.get(m.source_document_id) for m in matches}
 
     cfg = CheckSettingsSchema(**(check.settings or {}))
     token_mask = build_exclusion_mask(text, tokens_meta, segments, cfg)
@@ -376,6 +422,17 @@ def build_viewer_payload(db: Session, check_id: str) -> dict[str, Any]:
             out_segments[-1]["char_end"] = b1
             out_segments[-1]["text"] = text[out_segments[-1]["char_start"] : b1]
         else:
+            primary_rank = None
+            primary_color = None
+            primary_highlight = None
+            for mid in match_ids:
+                r = match_rank_map.get(mid)
+                if r is not None:
+                    primary_rank = r
+                    pal = color_for_rank(r)
+                    primary_color = pal["badge"]
+                    primary_highlight = pal["highlight"]
+                    break
             out_segments.append(
                 {
                     "char_start": b0,
@@ -384,6 +441,9 @@ def build_viewer_payload(db: Session, check_id: str) -> dict[str, Any]:
                     "category": cat,
                     "match_ids": match_ids,
                     "excluded_reason": excl_reason,
+                    "source_rank": primary_rank,
+                    "source_color": primary_color,
+                    "source_highlight": primary_highlight,
                 }
             )
 

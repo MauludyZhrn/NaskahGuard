@@ -201,6 +201,12 @@ export interface ReportSource {
   license?: string | null;
   indexing_status?: string;
   source_type: string;
+  category_key?: "internet" | "publication" | "local" | string;
+  category_label?: string;
+  color_hex?: string;
+  highlight_hex?: string;
+  chip_bg_hex?: string;
+  chip_text_hex?: string;
   access_status: string;
   provider: string;
   matched_words_exclusive: number;
@@ -208,6 +214,27 @@ export interface ReportSource {
   contribution_pct: number;
   layers: Record<string, number>;
   can_download_file: boolean;
+}
+
+export interface IntegrityFlagItem {
+  code: string;
+  title: string;
+  severity: "warning" | "info" | string;
+  count: number;
+  pages_count: number;
+  summary: string;
+  detail: string;
+}
+
+export interface SourceCategorySummary {
+  internet_pct: number;
+  publication_pct: number;
+  local_pct: number;
+  counts: {
+    internet: number;
+    publication: number;
+    local: number;
+  };
 }
 
 export interface SourceAcquisitionItem {
@@ -257,6 +284,9 @@ export interface SearchCoverageAnalytics {
 export interface ReportMatch {
   id: number;
   source_document_id: string;
+  source_rank?: number | null;
+  source_color?: string | null;
+  source_highlight?: string | null;
   source_title: string;
   layer: "EXACT" | "NEAR_EXACT" | "LEXICAL" | "SEMANTIC";
   sub_token_start: number;
@@ -290,17 +320,24 @@ export interface FullReport {
   document: {
     id: string;
     filename: string;
+    stored_name?: string;
     title: string;
+    authors?: string[];
     file_type: string;
+    size_bytes?: number;
     language: string;
     page_count: number;
     word_count: number;
+    character_count?: number;
     extraction_method: string;
     extraction_confidence: number;
     ocr_pages: number[];
     extra: Record<string, unknown>;
   };
   settings: CheckSettings;
+  active_filters?: string[];
+  source_categories?: SourceCategorySummary;
+  integrity_flags?: IntegrityFlagItem[];
   ai_report?: AiReportPayload | null;
   plain_summary?: {
     similarity_answer: string;
@@ -426,6 +463,9 @@ export interface ViewerSegment {
   category: "PLAIN" | "EXACT" | "NEAR_EXACT" | "LEXICAL" | "SEMANTIC" | "EXCLUDED";
   match_ids: number[];
   excluded_reason: string | null;
+  source_rank?: number | null;
+  source_color?: string | null;
+  source_highlight?: string | null;
 }
 
 export interface ViewerPayload {
