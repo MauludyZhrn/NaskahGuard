@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     THRESHOLD_LOW: float = 15.0
     THRESHOLD_HIGH: float = 30.0
 
+    # Phase 10: Local-First AI Writing Detection settings
+    AI_DETECTION_ENABLED: bool = True
+    AI_DEFAULT_MODEL: str = "ng-id-stylo-lm-v1"
+    AI_MIN_WORDS: int = 80
+    AI_LOCAL_CACHE_DIR: str = str(BASE_DIR / "data" / "models")
+
     # Phase 7: External Search, Crawler & Acquisition settings
     SEARXNG_URL: str = ""
     WEB_SEARCH_API_URL: str = ""

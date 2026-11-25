@@ -33,6 +33,8 @@ class CheckSettingsSchema(BaseModel):
     compare_with_previous_submissions: bool = False
     add_to_corpus_after_check: bool = False
     use_noplag_engine: bool = False
+    check_mode: str = Field(default="PLAGIARISM_ONLY", pattern="^(PLAGIARISM_ONLY|AI_ONLY|COMBINED)$")
+    ai_model_id: str | None = Field(default=None, max_length=64)
 
 
 class AppSettingsPayload(BaseModel):
@@ -95,6 +97,8 @@ class CheckSummaryOut(BaseModel):
     stage_counts: dict[str, Any]
     metrics: dict[str, Any]
     coverage: dict[str, Any]
+    mode: str = "PLAGIARISM_ONLY"
+    ai_report: dict[str, Any] | None = None
     error: str | None = None
     created_at: datetime
     started_at: datetime | None = None

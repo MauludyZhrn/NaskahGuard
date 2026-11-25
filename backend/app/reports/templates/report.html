@@ -145,6 +145,23 @@
       </table>
     </div>
 
+    {% if report.ai_report %}
+    <div class="section">
+      <h2>Bagian Deteksi Pola Tulisan AI (Terpisah dari Plagiasi)</h2>
+      <div class="notice">
+        <p>
+          <strong>Klasifikasi: {{ report.ai_report.classification_label }}</strong>
+          {% if report.ai_report.ai_likelihood_pct is not none %}
+            — Indikasi Pola AI: <strong>{{ "%.1f"|format(report.ai_report.ai_likelihood_pct) }}%</strong>
+          {% endif %}
+          (Keyakinan: {{ report.ai_report.confidence_label }})
+        </p>
+        <p>{{ report.ai_report.summary_id }}</p>
+        <p class="meta">{{ report.ai_report.disclaimer }}</p>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="section">
       <h2>Pernyataan Cakupan &amp; Keterbatasan Sistem</h2>
       <div class="notice">

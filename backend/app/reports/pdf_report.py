@@ -260,7 +260,26 @@ def render_pdf_bytes(report: dict[str, Any]) -> bytes:
     story.append(t_st)
     story.append(Spacer(1, 8))
 
-    # 8. Pernyataan Cakupan & Keterbatasan
+    # 8. Bagian Terpisah: Deteksi Pola Tulisan AI (Bila Tersedia)
+    ai_rep = report.get("ai_report")
+    if isinstance(ai_rep, dict):
+        story.append(Paragraph("Bagian Deteksi Pola Tulisan AI (Terpisah dari Plagiasi)", h2_style))
+        ai_pct = ai_rep.get("ai_likelihood_pct")
+        score_text = f"{ai_pct:.1f}%" if ai_pct is not None else "Tidak Cukup Bukti"
+        story.append(
+            Paragraph(
+                _safe_pdf_text(
+                    f"Klasifikasi: {ai_rep.get('classification_label', '-')} | "
+                    f"Indikasi Pola AI: {score_text} | Keyakinan: {ai_rep.get('confidence_label', '-')}"
+                ),
+                body_style,
+            )
+        )
+        story.append(Paragraph(_safe_pdf_text(ai_rep.get("summary_id", "")), small_style))
+        story.append(Paragraph(_safe_pdf_text(f"Catatan penting: {ai_rep.get('disclaimer', '')}"), small_style))
+        story.append(Spacer(1, 8))
+
+    # 9. Pernyataan Cakupan & Keterbatasan
     story.append(Paragraph("Pernyataan Cakupan & Keterbatasan Sistem", h2_style))
     story.append(Paragraph(_safe_pdf_text(coverage.get("statement", "")), body_style))
     for note in coverage.get("notes", []):

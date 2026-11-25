@@ -168,11 +168,50 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
         duration_sec = round((check.finished_at - check.started_at).total_seconds(), 2)
 
     settings = get_settings()
+    metrics = check.metrics or {}
+    coverage = check.coverage or {}
+    mode = check.mode or "PLAGIARISM_ONLY"
+    ai_rep = check.ai_report
+    si = float(metrics.get("similarity_index", 0.0))
+    matched_w = int(metrics.get("matched_words", 0))
+    eligible_w = int(metrics.get("eligible_words", doc.word_count or 0))
+    fulltext_cnt = int((coverage.get("source_metrics") or {}).get("fulltext_compared", coverage.get("total_sources_compared", 0)) or 0)
+
+    if mode == "AI_ONLY":
+        sim_q = "Mode Deteksi Tulisan AI tidak menjalankan perbandingan kemiripan plagiasi."
+        src_q = "Tidak mencari sumber kemiripan karena fokus pemeriksaan adalah pola tulisan AI."
+        cov_q = "Pemeriksaan difokuskan pada analisis gaya bahasa dan entropi teks secara lokal."
+    else:
+        sim_q = f"Indeks kemiripan sebesar {si:.1f}% ({matched_w:,} dari {eligible_w:,} kata yang diperiksa cocok dengan sumber)."
+        src_q = (
+            f"Ditemukan {len(sources_out)} sumber yang memiliki kecocokan terverifikasi."
+            if sources_out
+            else "Tidak ditemukan sumber dengan kecocokan teks pada korpus yang diperiksa."
+        )
+        cov_q = f"Sebanyak {fulltext_cnt} dokumen pembanding berteks lengkap dibandingkan terhadap naskah."
+
+    if ai_rep:
+        cls_label = str(ai_rep.get("classification_label") or "Tidak Diketahui")
+        ai_pct = ai_rep.get("ai_likelihood_pct")
+        ai_q = (
+            f"{cls_label} (indikasi pola AI sekitar {ai_pct:.1f}% — bersifat probabilistik, bukan vonis)."
+            if ai_pct is not None
+            else str(ai_rep.get("summary_id") or "Teks terlalu singkat untuk disimpulkan.")
+        )
+    else:
+        ai_q = "Deteksi tulisan AI tidak dijalankan pada mode pemeriksaan ini."
+
+    review_q = (
+        f"Periksa {len(matches_out)} bagian teks yang ditandai"
+        + (f" serta {len(ai_rep.get('highlights', []))} paragraf terindikasi pola AI." if ai_rep and ai_rep.get("highlights") else ".")
+    )
+
     return {
         "app_name": settings.APP_NAME,
         "check_id": check.id,
         "report_number": check.report_number,
         "status": check.status,
+        "mode": mode,
         "stage": check.stage,
         "created_at": check.created_at.isoformat() if check.created_at else None,
         "started_at": check.started_at.isoformat() if check.started_at else None,
@@ -192,8 +231,16 @@ def build_full_report(db: Session, check_id: str) -> dict[str, Any]:
             "extra": doc.extra or {},
         },
         "settings": check.settings or {},
-        "metrics": check.metrics or {},
-        "coverage": check.coverage or {},
+        "metrics": metrics,
+        "coverage": coverage,
+        "ai_report": ai_rep,
+        "plain_summary": {
+            "similarity_answer": sim_q,
+            "sources_answer": src_q,
+            "ai_answer": ai_q,
+            "review_answer": review_q,
+            "coverage_answer": cov_q,
+        },
         "stage_counts": check.stage_counts or {},
         "sources": sources_out,
         "matches": matches_out,

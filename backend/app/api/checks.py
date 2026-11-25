@@ -53,12 +53,14 @@ def _to_summary(chk: Check, doc: Document | None) -> CheckSummaryOut:
         document_filename=doc.filename if doc else None,
         document_title=(doc.title or doc.filename) if doc else None,
         status=chk.status,
+        mode=chk.mode or "PLAGIARISM_ONLY",
         stage=chk.stage,
         progress=chk.progress,
         settings=chk.settings or {},
         stage_counts=chk.stage_counts or {},
         metrics=chk.metrics or {},
         coverage=chk.coverage or {},
+        ai_report=chk.ai_report,
         error=chk.error,
         created_at=chk.created_at,
         started_at=chk.started_at,
@@ -83,6 +85,7 @@ def create_check(
         report_number=report_num,
         document_id=doc.id,
         status="QUEUED",
+        mode=cfg.check_mode,
         stage="Antrean",
         progress=0,
         settings=cfg.model_dump(),
@@ -100,23 +103,30 @@ def create_check(
         action="START_CHECK",
         target_type="check",
         target_id=chk.id,
-        details={"document_id": doc.id, "report_number": report_num, "use_external_sources": cfg.use_external_sources},
+        details={
+            "document_id": doc.id,
+            "report_number": report_num,
+            "check_mode": cfg.check_mode,
+            "use_external_sources": cfg.use_external_sources,
+        },
     )
     enqueue_check(chk.id)
-    return {"check_id": chk.id, "report_number": chk.report_number, "status": chk.status}
+    return {"check_id": chk.id, "report_number": chk.report_number, "status": chk.status, "mode": chk.mode}
 
 
 @router.get("", response_model=list[CheckSummaryOut])
 def list_checks(
+    mode: str | None = None,
     _actor: str = Depends(require_auth),
     db: Session = Depends(get_db),
 ) -> list[CheckSummaryOut]:
-    rows = (
+    query = (
         db.query(Check, Document)
         .outerjoin(Document, Check.document_id == Document.id)
-        .order_by(Check.created_at.desc())
-        .all()
     )
+    if mode:
+        query = query.filter(Check.mode == mode)
+    rows = query.order_by(Check.created_at.desc()).all()
     return [_to_summary(chk, doc) for chk, doc in rows]
 
 

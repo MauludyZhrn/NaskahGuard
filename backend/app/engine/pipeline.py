@@ -8,6 +8,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.ai_detection.detector import analyze_document_ai
+from app.ai_detection.model_registry import get_active_model_id
 from app.config import get_settings
 from app.engine.exact import RawMatch, find_exact_matches
 from app.engine.exclusions import build_exclusion_mask
@@ -67,6 +69,47 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
         stage_timings_ms: dict[str, int] = {}
         check.status = "PROCESSING"
         check.started_at = datetime.now(timezone.utc)
+        raw_cfg = dict(check.settings or {})
+        cfg = CheckSettingsSchema(**raw_cfg)
+        check_mode = str(raw_cfg.get("check_mode") or check.mode or "PLAGIARISM_ONLY")
+        if check_mode not in {"PLAGIARISM_ONLY", "AI_ONLY", "COMBINED"}:
+            check_mode = "PLAGIARISM_ONLY"
+        check.mode = check_mode
+
+        if check_mode == "AI_ONLY":
+            _update_progress(db, check, "Menganalisis pola penulisan AI", 35, stage_counts := {})
+            sub_payload = load_extracted_payload(doc.id)
+            sub_text = str(sub_payload.get("text") or "")
+            chosen_model = cfg.ai_model_id or get_active_model_id(db)
+            ai_result = analyze_document_ai(sub_text, model_id=chosen_model)
+            stage_counts["ai_detection"] = {
+                "classification": ai_result.get("classification"),
+                "word_count": ai_result.get("word_count", 0),
+                "paragraphs_analyzed": len([p for p in ai_result.get("paragraphs", []) if p.get("ai_likelihood_pct") is not None]),
+            }
+            check.ai_report = ai_result
+            check.metrics = {
+                "mode": "AI_ONLY",
+                "similarity_index": 0.0,
+                "matched_words": 0,
+                "eligible_words": int(ai_result.get("word_count", 0)),
+                "source_count": 0,
+                "score_note": "Mode Deteksi Tulisan AI terpisah (bukan pemeriksaan plagiasi)",
+            }
+            check.coverage = {
+                "mode": "AI_ONLY",
+                "ai_only": True,
+                "total_sources_compared": 0,
+                "source_metrics": {},
+            }
+            check.stage_counts = stage_counts
+            check.stage = "Selesai"
+            check.progress = 100
+            check.status = "COMPLETED"
+            check.finished_at = datetime.now(timezone.utc)
+            check.error = None
+            db.commit()
+            return
         cfg = CheckSettingsSchema(**(check.settings or {}))
 
         sub_payload = load_extracted_payload(doc.id)
@@ -428,6 +471,21 @@ def run_check_pipeline(db: Session, check_id: str) -> None:
             "sources": len(scoring.source_summaries),
             "report_number": check.report_number,
         }
+
+        if check_mode == "COMBINED":
+            _update_progress(db, check, "Menganalisis pola penulisan AI (Terpisah)", 92, stage_counts)
+            sub_payload_ai = load_extracted_payload(doc.id)
+            sub_text_ai = str(sub_payload_ai.get("text") or "")
+            chosen_model = cfg.ai_model_id or get_active_model_id(db)
+            ai_result = analyze_document_ai(sub_text_ai, model_id=chosen_model)
+            check.ai_report = ai_result
+            stage_counts["ai_detection"] = {
+                "classification": ai_result.get("classification"),
+                "word_count": ai_result.get("word_count", 0),
+                "paragraphs_analyzed": len([p for p in ai_result.get("paragraphs", []) if p.get("ai_likelihood_pct") is not None]),
+            }
+        else:
+            check.ai_report = None
 
         check.metrics = scoring.metrics
         check.coverage = coverage
