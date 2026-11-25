@@ -115,6 +115,21 @@ INITIAL_CATALOG_SEEDS: list[dict[str, Any]] = [
 ]
 
 
+def resolve_known_policy_profile(url: str | None) -> dict[str, Any] | None:
+    """Return known repository policy defaults (e.g. UNDIP metadata-only restriction) matching base/legacy URL."""
+    raw = (url or "").strip().lower().rstrip("/")
+    if not raw:
+        return None
+    for item in INITIAL_CATALOG_SEEDS:
+        cand_base = (item.get("base_url") or "").lower().rstrip("/")
+        cand_legacy = (item.get("legacy_url") or "").lower().rstrip("/")
+        if raw == cand_base or (cand_legacy and raw == cand_legacy):
+            return item
+    if "eprints.undip.ac.id" in raw or "eprints2.undip.ac.id" in raw:
+        return INITIAL_CATALOG_SEEDS[0]
+    return None
+
+
 def fulltext_policy_label(policy: str | None) -> str:
     return {
         "METADATA_ONLY_DEFAULT": "Metadata Saja (Default Kebijakan)",

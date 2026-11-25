@@ -208,6 +208,22 @@ def classify_oai_error(error_code: str | None) -> tuple[str | None, str | None]:
     return OAI_ERROR_CATEGORIES["OAI_PROTOCOL_FAILURE"]
 
 
+def classify_ui_failure_kind(error_code: str | None) -> tuple[str | None, str | None]:
+    """Map technical OAI/HTTP error code to an explicit user-facing diagnostic distinction."""
+    if not error_code:
+        return None, None
+    if error_code in {"HTTP_404", "HTML_RESPONSE", "badVerb"}:
+        return "OAI_ENDPOINT_NOT_FOUND", "Endpoint OAI-PMH tidak ditemukan"
+    if error_code in {"noRecordsMatch", "EMPTY_RECORDS"}:
+        return "EMPTY_RECORDS", "Repository tidak memiliki record"
+    if error_code in {"cannotDisseminateFormat", "noMetadataFormats"}:
+        return "UNAVAILABLE_METADATA_FORMAT", "Metadata format tidak tersedia"
+    if error_code in {"POLICY_RESTRICTED", "HTTP_403", "PDF_INACCESSIBLE", "HTTP_401"}:
+        return "FULLTEXT_POLICY_RESTRICTED", "Full-text dibatasi kebijakan"
+    _, cat_label = classify_oai_error(error_code)
+    return error_code, cat_label
+
+
 class OAIPMHProtocolError(ValueError):
     """Structured OAI-PMH / transport error carrying Bahasa Indonesia explanation, category & fix."""
 
@@ -1017,6 +1033,7 @@ def _make_stage(
         if error_category
         else classify_oai_error(error_code)
     )
+    kind_code, kind_label = classify_ui_failure_kind(error_code)
     return {
         "step": step,
         "key": key,
@@ -1026,6 +1043,8 @@ def _make_stage(
         "error_code": error_code,
         "error_category": cat_code,
         "error_category_label": cat_label,
+        "failure_kind": kind_code,
+        "failure_kind_label": kind_label,
         "message": message,
         "suggestion": suggestion,
         "duration_ms": duration_ms,
@@ -1564,6 +1583,7 @@ def _finalize_wizard_report(
         rec_estimate = st6_data.get("active_records")
 
     failed_stage = next((s for s in stages if s["status"] == "FAIL"), None)
+    diag_stage = failed_stage or next((s for s in stages if s["status"] == "WARN" and s.get("error_code")), None)
 
     # Core stages 1, 2, 3 must pass for READY/PARTIAL
     core_ok = all(s["status"] == "PASS" for s in stages if s["step"] in {1, 2, 3})
@@ -1591,6 +1611,11 @@ def _finalize_wizard_report(
         "sample_records": sample_records,
         "failure_category": (failed_stage or {}).get("error_category"),
         "failure_category_label": (failed_stage or {}).get("error_category_label"),
+        "failure_kind": (diag_stage or {}).get("failure_kind"),
+        "failure_kind_label": (diag_stage or {}).get("failure_kind_label"),
+        "failure_stage": (diag_stage or {}).get("title"),
+        "failure_http_status": (diag_stage or {}).get("http_status"),
+        "failure_suggestion": (diag_stage or {}).get("suggestion"),
         "failure_message": (failed_stage or {}).get("message"),
         "stages": stages,
         "tested_at": datetime.now(timezone.utc).isoformat(),

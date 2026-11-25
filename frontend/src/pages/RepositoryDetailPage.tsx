@@ -37,9 +37,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiFetch } from "../api/client";
+import { apiFetch, StructuredUiError, toStructuredUiError } from "../api/client";
 import { OAIWizardView } from "../components/OAIWizardView";
 import { PageHeader } from "../components/PageHeader";
+import { StructuredErrorAlert } from "../components/StructuredErrorAlert";
 import {
   OAIHarvestLogItem,
   OAIHarvestRecordItem,
@@ -82,7 +83,7 @@ export const RepositoryDetailPage: React.FC = () => {
   const [logs, setLogs] = useState<OAIHarvestLogItem[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<StructuredUiError | null>(null);
 
   // Collection & Filter options
   const [setSearch, setSetSearch] = useState("");
@@ -134,8 +135,13 @@ export const RepositoryDetailPage: React.FC = () => {
       setIndexedDocs(idxData.items);
       setRuns(runData);
       setLogs(logData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Memuat Detail Repositori",
+          endpointPath: `/oai/repositories/${repoId}`,
+        })
+      );
     }
   }, [repoId, recordFilter]);
 
@@ -164,8 +170,14 @@ export const RepositoryDetailPage: React.FC = () => {
       });
       setMessage("Pengaturan koleksi & filter panen disimpan.");
       await loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Simpan Filter & Pengaturan",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}`,
+        })
+      );
     } finally {
       setBusyAction(null);
     }
@@ -191,8 +203,14 @@ export const RepositoryDetailPage: React.FC = () => {
           : "Panen terjadwal opsional dinonaktifkan."
       );
       await loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Simpan Jadwal Panen",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/schedule`,
+        })
+      );
     } finally {
       setBusyAction(null);
     }
@@ -207,8 +225,14 @@ export const RepositoryDetailPage: React.FC = () => {
       await apiFetch(`/oai/repositories/${repo.id}/verify`, { method: "POST" });
       setMessage("Uji koneksi 8 tahap selesai dan tersimpan.");
       await loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Uji Koneksi OAI-PMH (8 Tahap)",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/verify`,
+        })
+      );
       await loadAll();
     } finally {
       setBusyAction(null);
@@ -230,8 +254,14 @@ export const RepositoryDetailPage: React.FC = () => {
         }),
       });
       setPreviewRecords(res.records);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Pratinjau Metadata OAI-PMH",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/preview`,
+        })
+      );
     } finally {
       setBusyAction(null);
     }
@@ -242,11 +272,11 @@ export const RepositoryDetailPage: React.FC = () => {
     setBusyAction(mode);
     setError(null);
     setMessage(null);
+    const endpoint =
+      mode === "resume"
+        ? `/oai/repositories/${repo.id}/resume`
+        : `/oai/repositories/${repo.id}/harvest`;
     try {
-      const endpoint =
-        mode === "resume"
-          ? `/oai/repositories/${repo.id}/resume`
-          : `/oai/repositories/${repo.id}/harvest`;
       const res = await apiFetch<{
         summary: {
           records_scanned?: number;
@@ -279,8 +309,14 @@ export const RepositoryDetailPage: React.FC = () => {
         `Panen selesai (${res.summary.records_scanned ?? res.summary.records_harvested} dipindai): ${res.summary.records_harvested} rekaman disimpan, ${res.summary.fulltext_indexed} full-text diindeks ke korpus lokal, ${res.summary.metadata_only} metadata saja.`
       );
       await loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: mode === "resume" ? "Lanjutkan Panen OAI-PMH" : "Mulai Panen OAI-PMH",
+          testedUrl: repo.base_url,
+          endpointPath: endpoint,
+        })
+      );
       await loadAll();
     } finally {
       setBusyAction(null);
@@ -295,8 +331,14 @@ export const RepositoryDetailPage: React.FC = () => {
       await apiFetch(`/oai/repositories/${repo.id}/pause`, { method: "POST" });
       setMessage("Panen dijeda. Anda dapat melanjutkan kapan saja dari posisi token terakhir.");
       await loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Jeda Panen OAI-PMH",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/pause`,
+        })
+      );
     } finally {
       setBusyAction(null);
     }
@@ -320,8 +362,14 @@ export const RepositoryDetailPage: React.FC = () => {
         `Percobaan ulang selesai: ${res.summary.retried} dicoba, ${res.summary.recovered_indexed} berhasil diindeks, ${res.summary.still_failed} masih gagal.`
       );
       await loadAll();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Ulangi Rekaman Gagal",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/retry-failed`,
+        })
+      );
     } finally {
       setBusyAction(null);
     }
@@ -335,11 +383,7 @@ export const RepositoryDetailPage: React.FC = () => {
           Kembali ke Daftar Repositori
         </Button>
         {error ? (
-          <Alert variant="destructive">
-            <AlertCircle className="size-4" aria-hidden="true" />
-            <AlertTitle>Gagal memuat repositori</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <StructuredErrorAlert error={error} title="Gagal memuat detail repositori" />
         ) : (
           <Skeleton className="h-48 w-full" />
         )}
@@ -445,13 +489,7 @@ export const RepositoryDetailPage: React.FC = () => {
           </Alert>
         )}
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="size-4" aria-hidden="true" />
-            <AlertTitle>Terjadi kendala</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        {error && <StructuredErrorAlert error={error} title="Terjadi kendala pada repositori" />}
 
         {repo.harvesting_permission_status === "METADATA_ALLOWED_FULLTEXT_RESTRICTED" && (
           <Alert>

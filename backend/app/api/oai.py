@@ -28,6 +28,7 @@ from app.sources.oai_catalog import (
     fulltext_policy_label,
     permission_status_label,
     promote_catalog_entry_to_personal,
+    resolve_known_policy_profile,
     serialize_catalog_entry,
     test_catalog_entry,
 )
@@ -115,6 +116,7 @@ class OAITestConnectionRequest(BaseModel):
     set_spec: str | None = Field(default=None, max_length=255)
     probe_pdf: bool = False
     auto_detect_fallback: bool = False
+    timeout_sec: int | None = Field(default=None, ge=5, le=120)
 
 
 class OAIPreviewRequest(BaseModel):
@@ -382,7 +384,7 @@ def auto_detect_repository_endpoint(
     body: OAIAutoDetectRequest,
     _rl: None = Depends(enforce_rate_limit),
 ) -> dict[str, Any]:
-    return auto_detect_oai_endpoint(body.base_url.strip())
+    return auto_detect_oai_endpoint(body.base_url.strip(), timeout_sec=20.0)
 
 
 @router.post("/test-connection")
@@ -391,14 +393,20 @@ def test_oai_connection_wizard(
     _rl: None = Depends(enforce_rate_limit),
 ) -> dict[str, Any]:
     """Run the 8-stage OAI-PMH connection wizard BEFORE saving a repository."""
+    target_url = body.base_url.strip()
+    is_slow_eprints = detect_platform_from_url(target_url) == "eprints" or "undip.ac.id" in target_url.lower()
+    effective_timeout = float(body.timeout_sec) if body.timeout_sec is not None else (40.0 if is_slow_eprints else 25.0)
+    if is_slow_eprints and effective_timeout < 35.0:
+        effective_timeout = 35.0
     report = run_connection_wizard(
-        body.base_url.strip(),
+        target_url,
         metadata_prefix=body.metadata_prefix,
         set_spec=body.set_spec or None,
         probe_pdf=body.probe_pdf,
+        timeout_sec=effective_timeout,
     )
     if not report["ok"] and body.auto_detect_fallback:
-        suggestion = auto_detect_oai_endpoint(body.base_url.strip())
+        suggestion = auto_detect_oai_endpoint(target_url, timeout_sec=min(effective_timeout, 25.0))
         report["auto_detect_suggestion"] = suggestion if suggestion.get("found") else None
     return report
 
@@ -438,21 +446,43 @@ def add_oai_repository(
     if norm_type == "other" and inferred_platform != "other":
         norm_type = inferred_platform
 
+    known_policy = resolve_known_policy_profile(clean_url)
+    eff_legacy = body.legacy_url.strip() if body.legacy_url else (known_policy.get("legacy_url") if known_policy else None)
+    eff_policy_url = body.policy_url.strip() if body.policy_url else (known_policy.get("policy_url") if known_policy else None)
+    eff_ft_policy = (
+        known_policy.get("fulltext_policy")
+        if known_policy and body.fulltext_policy == "OPEN_PUBLIC_PDF"
+        else body.fulltext_policy
+    )
+    eff_perm = (
+        known_policy.get("harvesting_permission_status")
+        if known_policy and body.harvesting_permission_status == "OPEN_UNRESTRICTED"
+        else body.harvesting_permission_status
+    )
+    eff_download_pdfs = (
+        False
+        if eff_perm == "METADATA_ALLOWED_FULLTEXT_RESTRICTED"
+        else (known_policy.get("default_download_pdfs", True) if known_policy and body.default_download_pdfs else body.default_download_pdfs)
+    )
+    eff_timeout = body.request_timeout_sec
+    if (norm_type == "eprints" or "undip.ac.id" in clean_url.lower()) and eff_timeout <= 25:
+        eff_timeout = 45
+
     repo = OAIRepository(
         name=body.name.strip(),
         base_url=clean_url,
-        legacy_url=body.legacy_url.strip() if body.legacy_url else None,
-        policy_url=body.policy_url.strip() if body.policy_url else None,
-        fulltext_policy=body.fulltext_policy,
-        harvesting_permission_status=body.harvesting_permission_status,
-        default_download_pdfs=body.default_download_pdfs,
+        legacy_url=eff_legacy,
+        policy_url=eff_policy_url,
+        fulltext_policy=eff_ft_policy,
+        harvesting_permission_status=eff_perm,
+        default_download_pdfs=eff_download_pdfs,
         repo_type=norm_type,
         platform_detected=inferred_platform if inferred_platform != "other" else norm_type,
         metadata_prefix=body.metadata_prefix.strip() or "oai_dc",
         selected_set=(body.selected_set or "").strip() or None,
         enabled=body.enabled,
         rate_limit_delay_sec=body.rate_limit_delay_sec,
-        request_timeout_sec=body.request_timeout_sec,
+        request_timeout_sec=eff_timeout,
         status="UNVERIFIED",
         harvest_state="IDLE",
         updated_at=datetime.now(timezone.utc),
@@ -468,6 +498,8 @@ def add_oai_repository(
             repo.supported_formats = body.test_report["supported_formats"]
         if isinstance(body.test_report.get("available_sets"), list):
             repo.available_sets = body.test_report["available_sets"]
+        if body.test_report.get("record_count_estimate") is not None:
+            repo.record_count_estimate = int(body.test_report["record_count_estimate"])
         if body.test_report.get("ok"):
             repo.status = "VERIFIED"
 

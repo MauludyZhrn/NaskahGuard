@@ -1,0 +1,68 @@
+{
+  "passed": true,
+  "tested_url": "https://eprints2.undip.ac.id/cgi/oai2",
+  "network_oai_calls": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:5173/api/oai/repositories",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:5173/api/oai/catalog?",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:5173/api/oai/repositories",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:5173/api/oai/catalog?",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:5173/api/oai/auto-detect",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:5173/api/oai/auto-detect",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:5173/api/oai/test-connection",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:5173/api/oai/repositories",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:5173/api/oai/repositories",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:5173/api/oai/catalog?",
+      "status": 200
+    }
+  ],
+  "console_errors": [],
+  "page_errors": [],
+  "undip_saved_policy_verified": {
+    "fulltext_policy": "METADATA_ONLY_DEFAULT",
+    "harvesting_permission_status": "METADATA_ALLOWED_FULLTEXT_RESTRICTED",
+    "default_download_pdfs": false,
+    "status": "VERIFIED"
+  },
+  "screenshots": [
+    "docs\\screenshots\\phase10_after\\25_undip_modal_wizard_pass.png",
+    "docs\\screenshots\\phase10_after\\26_oai_structured_error_alert.png"
+  ]
+}

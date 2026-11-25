@@ -100,6 +100,8 @@ export interface OAIWizardStage {
   error_code: string | null;
   error_category?: string | null;
   error_category_label?: string | null;
+  failure_kind?: string | null;
+  failure_kind_label?: string | null;
   message: string;
   suggestion: string | null;
   duration_ms: number;
@@ -138,6 +140,11 @@ export interface OAIConnectionWizardReport {
   sample_records: OAISampleRecord[];
   failure_category?: string | null;
   failure_category_label?: string | null;
+  failure_kind?: string | null;
+  failure_kind_label?: string | null;
+  failure_stage?: string | null;
+  failure_http_status?: number | null;
+  failure_suggestion?: string | null;
   failure_message?: string | null;
   stages: OAIWizardStage[];
   tested_at: string;

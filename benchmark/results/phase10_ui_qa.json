@@ -78,14 +78,14 @@
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/repositories/1fb683bf-74bd-4342-bcc6-d5e7e4948fe6",
+      "route": "/repositories/e87c16c4-69bf-42b7-bc69-185a93996947",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/reports/f7d0e30f-2f47-4769-bb7b-b2abf83ac2b0",
+      "route": "/reports/4471c056-b5ba-4cc7-a6a5-9e6d36dfbd73",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true

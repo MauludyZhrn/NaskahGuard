@@ -54,9 +54,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiFetch } from "../api/client";
+import { apiFetch, StructuredUiError, toStructuredUiError } from "../api/client";
 import { OAIWizardView } from "../components/OAIWizardView";
 import { PageHeader } from "../components/PageHeader";
+import { StructuredErrorAlert } from "../components/StructuredErrorAlert";
 import {
   OAIAutoDetectResult,
   OAIConnectionWizardReport,
@@ -108,7 +109,7 @@ export const RepositoriesPage: React.FC = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<OAIRepositoryItem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<StructuredUiError | null>(null);
 
   // Catalog state
   const [catalogItems, setCatalogItems] = useState<RepositoryCatalogItem[] | null>(null);
@@ -145,7 +146,7 @@ export const RepositoriesPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [detectResult, setDetectResult] = useState<OAIAutoDetectResult | null>(null);
   const [wizardReport, setWizardReport] = useState<OAIConnectionWizardReport | null>(null);
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<StructuredUiError | null>(null);
 
   // Edit dialog state
   const [editRepo, setEditRepo] = useState<OAIRepositoryItem | null>(null);
@@ -161,7 +162,9 @@ export const RepositoriesPage: React.FC = () => {
   const loadRepos = useCallback(() => {
     apiFetch<OAIRepositoryItem[]>("/oai/repositories")
       .then(setRepos)
-      .catch((err: Error) => setError(err.message));
+      .catch((err: unknown) =>
+        setError(toStructuredUiError(err, { stage: "Memuat Daftar Repositori", endpointPath: "/oai/repositories" }))
+      );
   }, []);
 
   const loadCatalog = useCallback(() => {
@@ -171,7 +174,9 @@ export const RepositoriesPage: React.FC = () => {
     if (catalogStatus !== "ALL") qs.set("status", catalogStatus);
     apiFetch<{ items: RepositoryCatalogItem[] }>(`/oai/catalog?${qs.toString()}`)
       .then((res) => setCatalogItems(res.items))
-      .catch((err: Error) => setError(err.message));
+      .catch((err: unknown) =>
+        setError(toStructuredUiError(err, { stage: "Memuat Katalog Repositori", endpointPath: "/oai/catalog" }))
+      );
   }, [catalogQuery, catalogPlatform, catalogStatus]);
 
   useEffect(() => {
@@ -196,7 +201,8 @@ export const RepositoriesPage: React.FC = () => {
   };
 
   const handleAutoDetect = async () => {
-    if (!formUrl.trim()) return;
+    const targetUrl = formUrl.trim();
+    if (!targetUrl) return;
     setDetecting(true);
     setModalError(null);
     setDetectResult(null);
@@ -204,38 +210,55 @@ export const RepositoriesPage: React.FC = () => {
       const res = await apiFetch<OAIAutoDetectResult>("/oai/auto-detect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base_url: formUrl.trim() }),
+        body: JSON.stringify({ base_url: targetUrl }),
       });
       setDetectResult(res);
       if (res.found && res.detected_url) {
         setFormUrl(res.detected_url);
-        setFormType(res.platform_detected || "other");
+        const plat = res.platform_detected || "other";
+        setFormType(plat);
+        if ((plat === "eprints" || res.detected_url.toLowerCase().includes("undip.ac.id")) && formTimeout === "20") {
+          setFormTimeout("45");
+        }
         if (!formName.trim() && res.identified_name) {
           setFormName(res.identified_name);
         }
       }
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err: unknown) {
+      setModalError(
+        toStructuredUiError(err, {
+          stage: "Deteksi Otomatis Endpoint OAI-PMH",
+          testedUrl: targetUrl,
+          endpointPath: "/oai/auto-detect",
+        })
+      );
     } finally {
       setDetecting(false);
     }
   };
 
   const handleTestWizard = async () => {
-    if (!formUrl.trim()) return;
+    const targetUrl = formUrl.trim();
+    if (!targetUrl) return;
     setTesting(true);
     setModalError(null);
     setWizardReport(null);
+    const isSlowEprints = formType === "eprints" || targetUrl.toLowerCase().includes("undip.ac.id") || targetUrl.toLowerCase().includes("/cgi/oai");
+    const effectiveTimeout = Math.max(Number(formTimeout) || 20, isSlowEprints ? 45 : 25);
+    if (isSlowEprints && formTimeout === "20") {
+      setFormTimeout("45");
+    }
     try {
       const report = await apiFetch<OAIConnectionWizardReport>("/oai/test-connection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          base_url: formUrl.trim(),
+          base_url: targetUrl,
           metadata_prefix: formPrefix.trim() || "oai_dc",
           set_spec: formSet.trim() || null,
           probe_pdf: false,
           auto_detect_fallback: true,
+          timeout_sec: effectiveTimeout,
         }),
       });
       setWizardReport(report);
@@ -250,8 +273,14 @@ export const RepositoriesPage: React.FC = () => {
           setFormPrefix(report.recommended_prefix);
         }
       }
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err: unknown) {
+      setModalError(
+        toStructuredUiError(err, {
+          stage: "Uji Koneksi OAI-PMH (8 Tahap)",
+          testedUrl: targetUrl,
+          endpointPath: "/oai/test-connection",
+        })
+      );
     } finally {
       setTesting(false);
     }
@@ -259,31 +288,46 @@ export const RepositoriesPage: React.FC = () => {
 
   const handleSaveNew = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formUrl.trim()) return;
+    const targetUrl = wizardReport?.ok ? wizardReport.effective_url : formUrl.trim();
+    if (!formName.trim() || !targetUrl) return;
     setSaving(true);
     setModalError(null);
+    const isUndip = targetUrl.toLowerCase().includes("undip.ac.id");
     try {
       await apiFetch<OAIRepositoryItem>("/oai/repositories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formName.trim(),
-          base_url: wizardReport?.ok ? wizardReport.effective_url : formUrl.trim(),
+          base_url: targetUrl,
           repo_type: formType,
           metadata_prefix: formPrefix.trim() || "oai_dc",
           selected_set: formSet.trim() || null,
           rate_limit_delay_sec: Number(formDelay) || 0.8,
-          request_timeout_sec: Number(formTimeout) || 20,
+          request_timeout_sec: Math.max(Number(formTimeout) || 20, formType === "eprints" || isUndip ? 45 : 20),
+          default_download_pdfs: !isUndip,
+          harvesting_permission_status: isUndip ? "METADATA_ALLOWED_FULLTEXT_RESTRICTED" : "OPEN_UNRESTRICTED",
+          fulltext_policy: isUndip ? "METADATA_ONLY_DEFAULT" : "OPEN_PUBLIC_PDF",
           test_report: wizardReport,
         }),
       });
       setAddOpen(false);
       resetAddModal();
-      setMessage("Repositori akademik OAI-PMH berhasil ditambahkan ke daftar pribadi.");
+      setMessage(
+        isUndip
+          ? "Repositori UNDIP berhasil ditambahkan dalam mode Metadata Saja (default kebijakan policies.html UNDIP)."
+          : "Repositori akademik OAI-PMH berhasil ditambahkan ke daftar pribadi."
+      );
       loadRepos();
       loadCatalog();
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err: unknown) {
+      setModalError(
+        toStructuredUiError(err, {
+          stage: "Simpan Repositori Pribadi",
+          testedUrl: targetUrl,
+          endpointPath: "/oai/repositories",
+        })
+      );
     } finally {
       setSaving(false);
     }
@@ -303,8 +347,14 @@ export const RepositoriesPage: React.FC = () => {
         `Hasil uji konektivitas ${res.entry.university}: status ${res.entry.oai_status} (${res.entry.collections_count} koleksi, ${res.entry.supported_formats.length} format metadata).`
       );
       loadCatalog();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Uji Koneksi Katalog",
+          testedUrl: entry.base_url,
+          endpointPath: `/oai/catalog/${entry.id}/test`,
+        })
+      );
     } finally {
       setTestingCatalogId(null);
     }
@@ -326,8 +376,14 @@ export const RepositoriesPage: React.FC = () => {
       );
       loadRepos();
       loadCatalog();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Tambahkan dari Katalog",
+          testedUrl: entry.base_url,
+          endpointPath: `/oai/catalog/${entry.id}/add`,
+        })
+      );
     } finally {
       setAddingCatalogId(null);
     }
@@ -358,8 +414,14 @@ export const RepositoriesPage: React.FC = () => {
       setCatDesc("");
       setMessage("Repositori ditambahkan ke katalog dengan status Belum Diuji. Klik 'Uji Konektivitas' untuk memverifikasi.");
       loadCatalog();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Daftarkan Endpoint ke Katalog",
+          testedUrl: catUrl.trim(),
+          endpointPath: "/oai/catalog",
+        })
+      );
     } finally {
       setSavingCat(false);
     }
@@ -398,8 +460,14 @@ export const RepositoriesPage: React.FC = () => {
       setEditRepo(null);
       setMessage("Pengaturan repositori berhasil diperbarui.");
       loadRepos();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Perbarui Pengaturan Repositori",
+          testedUrl: editUrl.trim(),
+          endpointPath: `/oai/repositories/${editRepo.id}`,
+        })
+      );
     } finally {
       setSavingEdit(false);
     }
@@ -418,8 +486,14 @@ export const RepositoriesPage: React.FC = () => {
         `Uji koneksi 8 tahap selesai: ${res.identify?.repositoryName || repo.name} (${res.wizard?.overall_status || "VERIFIED"}).`
       );
       loadRepos();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Verifikasi Koneksi 8 Tahap",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/verify`,
+        })
+      );
       loadRepos();
     } finally {
       setBusyId(null);
@@ -430,10 +504,10 @@ export const RepositoriesPage: React.FC = () => {
     setBusyId(repo.id);
     setError(null);
     setMessage(null);
+    const endpoint = resume
+      ? `/oai/repositories/${repo.id}/resume`
+      : `/oai/repositories/${repo.id}/harvest`;
     try {
-      const endpoint = resume
-        ? `/oai/repositories/${repo.id}/resume`
-        : `/oai/repositories/${repo.id}/harvest`;
       const res = await apiFetch<{
         summary: { records_harvested?: number; fulltext_indexed?: number; metadata_only?: number };
       }>(endpoint, {
@@ -442,7 +516,10 @@ export const RepositoriesPage: React.FC = () => {
         body: JSON.stringify({
           max_records: 15,
           max_downloads: repo.max_downloads ?? 10,
-          download_pdfs: true,
+          download_pdfs:
+            repo.harvesting_permission_status === "METADATA_ALLOWED_FULLTEXT_RESTRICTED"
+              ? false
+              : (repo.default_download_pdfs ?? true),
           resume,
         }),
       });
@@ -450,8 +527,14 @@ export const RepositoriesPage: React.FC = () => {
         `Panen ${repo.name} selesai: ${res.summary?.records_harvested ?? 0} rekaman diproses, ${res.summary?.fulltext_indexed ?? 0} full-text diindeks ke korpus lokal.`
       );
       loadRepos();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: resume ? "Lanjutkan Panen OAI-PMH" : "Mulai Panen OAI-PMH",
+          testedUrl: repo.base_url,
+          endpointPath: endpoint,
+        })
+      );
       loadRepos();
     } finally {
       setBusyId(null);
@@ -465,8 +548,14 @@ export const RepositoriesPage: React.FC = () => {
       await apiFetch(`/oai/repositories/${repo.id}/pause`, { method: "POST" });
       setMessage(`Repositori ${repo.name} dijeda. Progres dan token tersimpan.`);
       loadRepos();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Jeda Panen OAI-PMH",
+          testedUrl: repo.base_url,
+          endpointPath: `/oai/repositories/${repo.id}/pause`,
+        })
+      );
     } finally {
       setBusyId(null);
     }
@@ -480,8 +569,14 @@ export const RepositoriesPage: React.FC = () => {
       setPendingDelete(null);
       loadRepos();
       loadCatalog();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(
+        toStructuredUiError(err, {
+          stage: "Hapus Repositori",
+          testedUrl: pendingDelete.base_url,
+          endpointPath: `/oai/repositories/${pendingDelete.id}`,
+        })
+      );
     }
   };
 
@@ -517,13 +612,7 @@ export const RepositoriesPage: React.FC = () => {
           </Alert>
         )}
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="size-4" aria-hidden="true" />
-            <AlertTitle>Terjadi kendala</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+        {error && <StructuredErrorAlert error={error} title="Kendala Pengelolaan Repositori" />}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card className="shadow-none">
@@ -1060,11 +1149,16 @@ export const RepositoriesPage: React.FC = () => {
               </DialogDescription>
             </DialogHeader>
 
-            {modalError && (
-              <Alert variant="destructive">
+            {modalError && <StructuredErrorAlert error={modalError} title="Gagal memproses repositori" />}
+
+            {formUrl.toLowerCase().includes("undip.ac.id") && (
+              <Alert>
                 <AlertCircle className="size-4" aria-hidden="true" />
-                <AlertTitle>Gagal memproses</AlertTitle>
-                <AlertDescription>{modalError}</AlertDescription>
+                <AlertTitle>Kebijakan Data UNDIP: Mode Metadata Saja (Default)</AlertTitle>
+                <AlertDescription className="text-xs leading-relaxed">
+                  Sesuai kebijakan resmi <span className="font-mono">https://eprints2.undip.ac.id/policies.html</span>,
+                  metadata terbuka dengan atribusi, sedangkan pengunduhan PDF massal oleh robot dinonaktifkan secara default.
+                </AlertDescription>
               </Alert>
             )}
 
@@ -1108,12 +1202,27 @@ export const RepositoriesPage: React.FC = () => {
                 </div>
               </div>
 
-              {detectResult && (
-                <Alert variant={detectResult.found ? "default" : "destructive"}>
+              {detectResult && !detectResult.found && (
+                <StructuredErrorAlert
+                  title="Deteksi Otomatis Belum Menemukan Endpoint OAI-PMH"
+                  error={{
+                    errorKind: detectResult.attempts.some((a) => a.error_code === "HTTP_404" || a.error_code === "HTML_RESPONSE")
+                      ? "OAI_ENDPOINT_NOT_FOUND"
+                      : "HTTP_ERROR",
+                    errorKindLabel: "Endpoint OAI-PMH tidak ditemukan",
+                    stage: "Deteksi Otomatis (Identify)",
+                    testedUrl: detectResult.input_url,
+                    httpStatus: detectResult.attempts.find((a) => a.http_status)?.http_status ?? null,
+                    cause: detectResult.message,
+                    suggestion:
+                      "Masukkan URL endpoint OAI-PMH langsung (/cgi/oai2 untuk EPrints, /server/oai/request untuk DSpace 7, /oai/request untuk DSpace lama, /index.php/{jurnal}/oai untuk OJS).",
+                  }}
+                />
+              )}
+              {detectResult && detectResult.found && (
+                <Alert variant="default">
                   <Search className="size-4" aria-hidden="true" />
-                  <AlertTitle>
-                    {detectResult.found ? "Endpoint OAI-PMH Terdeteksi" : "Endpoint Belum Terdeteksi Otomatis"}
-                  </AlertTitle>
+                  <AlertTitle>Endpoint OAI-PMH Terdeteksi</AlertTitle>
                   <AlertDescription>{detectResult.message}</AlertDescription>
                 </Alert>
               )}

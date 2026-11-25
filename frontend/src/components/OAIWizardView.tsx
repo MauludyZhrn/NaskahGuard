@@ -9,6 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { StructuredErrorAlert } from "./StructuredErrorAlert";
 import { OAIConnectionWizardReport, OAIWizardStage } from "../types";
 
 interface OAIWizardViewProps {
@@ -38,8 +39,53 @@ function stageLabel(status: OAIWizardStage["status"]): string {
 }
 
 export const OAIWizardView: React.FC<OAIWizardViewProps> = ({ report, showSamples = true }) => {
+  const diagnosticStage =
+    report.stages.find((st) => st.status === "FAIL") ||
+    report.stages.find((st) => st.status === "WARN" && Boolean(st.failure_kind || st.error_code));
+
   return (
     <div className="flex flex-col gap-4">
+      {(report.overall_status === "FAILED" || (diagnosticStage && diagnosticStage.failure_kind)) && (
+        <StructuredErrorAlert
+          title={
+            report.overall_status === "FAILED"
+              ? "Uji Koneksi OAI-PMH Gagal"
+              : "Catatan Diagnostik Repositori"
+          }
+          error={{
+            errorKind:
+              diagnosticStage?.failure_kind === "OAI_ENDPOINT_NOT_FOUND"
+                ? "OAI_ENDPOINT_NOT_FOUND"
+                : diagnosticStage?.failure_kind === "EMPTY_RECORDS"
+                  ? "EMPTY_RECORDS"
+                  : diagnosticStage?.failure_kind === "UNAVAILABLE_METADATA_FORMAT"
+                    ? "UNAVAILABLE_METADATA_FORMAT"
+                    : diagnosticStage?.failure_kind === "FULLTEXT_POLICY_RESTRICTED"
+                      ? "FULLTEXT_POLICY_RESTRICTED"
+                      : "HTTP_ERROR",
+            errorKindLabel:
+              report.failure_kind_label ||
+              diagnosticStage?.failure_kind_label ||
+              report.failure_category_label ||
+              "Kendala OAI-PMH",
+            stage:
+              report.failure_stage ||
+              diagnosticStage?.title ||
+              "Verifikasi Protokol OAI-PMH",
+            testedUrl: report.effective_url || report.input_url,
+            httpStatus:
+              report.failure_http_status ?? diagnosticStage?.http_status ?? null,
+            cause:
+              report.failure_message ||
+              diagnosticStage?.message ||
+              "Pengujian protokol OAI-PMH menemui kendala.",
+            suggestion:
+              report.failure_suggestion ||
+              diagnosticStage?.suggestion ||
+              "Periksa URL endpoint OAI-PMH dan jalankan Uji Koneksi ulang.",
+          }}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
         <div className="flex flex-col gap-0.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -106,7 +152,12 @@ export const OAIWizardView: React.FC<OAIWizardViewProps> = ({ report, showSample
                     HTTP {st.http_status}
                   </Badge>
                 )}
-                {st.error_category_label && (
+                {st.failure_kind_label && (
+                  <Badge variant="destructive" className="text-[11px]">
+                    {st.failure_kind_label}
+                  </Badge>
+                )}
+                {st.error_category_label && st.error_category_label !== st.failure_kind_label && (
                   <Badge variant="secondary" className="text-[11px]">
                     {st.error_category_label}
                   </Badge>
