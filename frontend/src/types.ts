@@ -157,6 +157,21 @@ export interface AiReportPayload {
   };
   model_used: string;
   requested_model?: string;
+  calibration?: {
+    calibrated: boolean;
+    method: string;
+    temperature: number;
+    ai_threshold: number;
+    human_threshold: number;
+    validation_metrics?: Record<string, unknown>;
+  };
+  paragraph_summary?: {
+    total_paragraphs: number;
+    ai_likely_count: number;
+    human_likely_count: number;
+    uncertain_count: number;
+    insufficient_count: number;
+  };
   summary_id: string;
   signals: AiSignalItem[];
   paragraphs: AiParagraphItem[];

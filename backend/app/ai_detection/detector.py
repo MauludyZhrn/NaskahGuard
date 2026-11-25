@@ -322,6 +322,22 @@ def analyze_document_ai(text: str, model_id: str | None = None) -> dict[str, Any
         for p in paragraphs_raw
     ]
 
+    para_summary = {
+        "total_paragraphs": len(para_results),
+        "ai_likely_count": sum(1 for p in para_results if p["classification"] == "AI_LIKELY"),
+        "human_likely_count": sum(1 for p in para_results if p["classification"] == "HUMAN_LIKELY"),
+        "uncertain_count": sum(1 for p in para_results if p["classification"] == "MIXED_UNCERTAIN"),
+        "insufficient_count": sum(1 for p in para_results if p["classification"] == "INSUFFICIENT_DATA"),
+    }
+    calibration_meta = {
+        "calibrated": True,
+        "method": "Temperature Scaling + Ambang Konservatif",
+        "temperature": float(art.get("temperature", 1.3)),
+        "ai_threshold": float(art.get("thresholds", {}).get("ai_min", 0.68)),
+        "human_threshold": float(art.get("thresholds", {}).get("human_max", 0.38)),
+        "validation_metrics": art.get("validation_metrics", {}),
+    }
+
     if word_count < min_doc_words:
         return {
             "score_available": False,
@@ -336,6 +352,8 @@ def analyze_document_ai(text: str, model_id: str | None = None) -> dict[str, Any
             "language": lang_info,
             "model_used": BUILTIN_MODEL_ID,
             "requested_model": chosen_model_id,
+            "calibration": calibration_meta,
+            "paragraph_summary": para_summary,
             "summary_id": (
                 f"Teks hanya memiliki {word_count} kata (batas minimum {min_doc_words} kata), "
                 "sehingga sistem menolak menyimpulkan indikasi tulisan AI untuk menghindari tuduhan keliru."
@@ -428,6 +446,8 @@ def analyze_document_ai(text: str, model_id: str | None = None) -> dict[str, Any
         "language": lang_info,
         "model_used": BUILTIN_MODEL_ID,
         "requested_model": chosen_model_id,
+        "calibration": calibration_meta,
+        "paragraph_summary": para_summary,
         "summary_id": summary_id,
         "signals": signals,
         "paragraphs": para_results,

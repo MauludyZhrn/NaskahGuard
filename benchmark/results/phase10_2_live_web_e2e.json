@@ -1,0 +1,111 @@
+{
+  "mode": "real_live_public_source_e2e",
+  "seed_local_corpus_docs": 0,
+  "target_public_article": {
+    "title": "JSidentify-V2: Leveraging Dynamic Memory Fingerprinting for Mini-Game Plagiarism Detection",
+    "pmcid": "http://arxiv.org/abs/2508.01655v1"
+  },
+  "check_status": "COMPLETED",
+  "elapsed_ms": 15651.84,
+  "similarity_index_pct": 63.64,
+  "matched_words": 63,
+  "eligible_words": 99,
+  "search_coverage": {
+    "total_search_queries": 6,
+    "total_provider_responses": 6,
+    "total_unique_urls_found": 10,
+    "total_pages_crawled": 5,
+    "total_fulltext_fetched": 5,
+    "total_fulltext_indexed": 5,
+    "total_metadata_only": 0,
+    "total_inaccessible_sources": 0,
+    "total_failed_crawling": 0,
+    "total_verified_matching_sources": 1,
+    "providers_failed": [],
+    "relevance_breakdown": {
+      "HIGHLY_RELEVANT": 1,
+      "RELEVANT": 4
+    },
+    "generated_queries": [
+      {
+        "query": "\"JSidentify-V2 Leveraging Dynamic Memory Fingerprinting for Mini-Game Plagiarism Detection\"",
+        "kind": "exact_phrase",
+        "chapter": "Bagian Awal",
+        "score": 3.576,
+        "level": 3
+      },
+      {
+        "query": "\"dikosongkan sepenuhnya sehingga seluruh sumber pembanding dan kecocokan teks\"",
+        "kind": "exact_phrase",
+        "chapter": "Pendahuluan dan Tinjauan Pustaka",
+        "score": 4.604,
+        "level": 3
+      },
+      {
+        "query": "detection fingerprinting jsidentify-v2 memory dynamic leveraging",
+        "kind": "distinctive_keywords",
+        "chapter": "Bagian Awal",
+        "score": 3.176,
+        "level": 4
+      }
+    ],
+    "indicators": {
+      "local_corpus_coverage": "0 dokumen lokal terindeks",
+      "academic_database_coverage": "Aktif",
+      "public_web_coverage": "Nonaktif",
+      "oai_pmh_coverage": "Aktif (via Korpus Lokal)",
+      "fulltext_availability": "5 dokumen full-text dibandingkan",
+      "external_search_coverage": "5 full-text diindeks dari 10 URL ditemukan"
+    },
+    "coverage_disclaimer": "Cakupan menunjukkan jumlah sumber yang berhasil diakses dan diverifikasi dalam pemeriksaan ini, bukan persentase keseluruhan dokumen yang ada di internet."
+  },
+  "verified_matching_sources": [
+    {
+      "rank": 1,
+      "title": "JSidentify-V2: Leveraging Dynamic Memory Fingerprinting for Mini-Game Plagiarism Detection",
+      "provider": "arxiv",
+      "url": "http://arxiv.org/abs/2508.01655v1",
+      "doi": null,
+      "contribution_pct": 63.64,
+      "matched_words_exclusive": 63
+    }
+  ],
+  "acquisitions_count": 5,
+  "acquisitions_sample": [
+    {
+      "provider": "arxiv",
+      "status": "FULLTEXT_INDEXED",
+      "title": "Adaptive Intrusion Detection System Leveraging Dynamic Neural Models with Adversarial Learning for 5G/6G Networks",
+      "source_url": "http://arxiv.org/abs/2512.10637v2",
+      "used_playwright": false
+    },
+    {
+      "provider": "arxiv",
+      "status": "FULLTEXT_INDEXED",
+      "title": "LeakGuard: Detecting Memory Leaks Accurately and Scalably",
+      "source_url": "http://arxiv.org/abs/2504.04422v1",
+      "used_playwright": false
+    },
+    {
+      "provider": "arxiv",
+      "status": "MATCH_VERIFIED",
+      "title": "JSidentify-V2: Leveraging Dynamic Memory Fingerprinting for Mini-Game Plagiarism Detection",
+      "source_url": "http://arxiv.org/abs/2508.01655v1",
+      "used_playwright": false
+    },
+    {
+      "provider": "arxiv",
+      "status": "FULLTEXT_INDEXED",
+      "title": "Application of Tabular Transformer Architectures for Operating System Fingerprinting",
+      "source_url": "http://arxiv.org/abs/2502.09084v1",
+      "used_playwright": false
+    },
+    {
+      "provider": "arxiv",
+      "status": "FULLTEXT_INDEXED",
+      "title": "Optimization of Memory Usage in Tardos's Fingerprinting Codes",
+      "source_url": "http://arxiv.org/abs/cs/0610036v3",
+      "used_playwright": false
+    }
+  ]
+}

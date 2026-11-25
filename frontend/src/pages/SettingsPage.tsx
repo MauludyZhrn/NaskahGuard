@@ -213,6 +213,9 @@ export const SettingsPage: React.FC = () => {
                   {payload.system.ocr_available ? "Tersedia" : "Tidak Aktif"}
                 </Badge>
               </div>
+              {payload.system.ocr_message && (
+                <span className="text-[11px] text-muted-foreground">{payload.system.ocr_message}</span>
+              )}
             </div>
             <div className="rounded-md border border-border p-3 flex flex-col gap-1">
               <span className="text-muted-foreground">Kemiripan Makna Lokal</span>

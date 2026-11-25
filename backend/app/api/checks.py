@@ -80,6 +80,16 @@ def create_check(
         raise HTTPException(status_code=404, detail="Dokumen submission tidak ditemukan.")
 
     cfg = body.settings if body.settings is not None else _default_check_settings(db)
+    if cfg.ai_model_id and cfg.check_mode in {"AI_ONLY", "COMBINED"}:
+        from app.ai_detection.model_registry import get_model_catalog
+        cat_map = {m["id"]: m for m in get_model_catalog()}
+        if cfg.ai_model_id not in cat_map:
+            raise HTTPException(status_code=400, detail=f"Model AI '{cfg.ai_model_id}' tidak terdaftar.")
+        if not cat_map[cfg.ai_model_id]["installed"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model AI '{cfg.ai_model_id}' belum terpasang secara lokal. Gunakan 'ng-id-stylo-lm-v1' atau pasang dependensi opsional.",
+            )
     report_num = _next_report_number(db)
     chk = Check(
         report_number=report_num,

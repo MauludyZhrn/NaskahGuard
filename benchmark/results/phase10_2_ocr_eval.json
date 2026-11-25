@@ -1,0 +1,72 @@
+{
+  "ocr_status": {
+    "available": true,
+    "message": "Tesseract OCR aktif (eng, ind, osd).",
+    "binary_path": "C:\\Users\\Mauludy Zahron\\AppData\\Local\\Programs\\Tesseract-OCR\\tesseract.exe",
+    "languages": [
+      "eng",
+      "ind",
+      "osd"
+    ]
+  },
+  "scenarios": [
+    {
+      "scenario": "1_scanned_pdf_indonesian",
+      "extraction_method": "OCR",
+      "ocr_pages": [
+        1
+      ],
+      "extraction_confidence": 0.9427,
+      "word_recall": 1.0,
+      "extracted_chars": 122,
+      "latency_ms": 710.61,
+      "extracted_preview": "Penelitian kemiripan dokumen akademik berbasis korpus lokal di perguruan tinggi menjaga integritas karya ilmiah mahasiswa."
+    },
+    {
+      "scenario": "2_scanned_pdf_english",
+      "extraction_method": "OCR",
+      "ocr_pages": [
+        1
+      ],
+      "extraction_confidence": 0.926,
+      "word_recall": 1.0,
+      "extracted_chars": 124,
+      "latency_ms": 745.04,
+      "extracted_preview": "Academic integrity verification relies on transparent document comparison against open scholarly archives and local corpora."
+    },
+    {
+      "scenario": "3_mixed_text_and_image_pdf",
+      "extraction_method": "MIXED",
+      "ocr_pages": [
+        2
+      ],
+      "extraction_confidence": 0.9427,
+      "word_recall": 1.0,
+      "extracted_chars": 203,
+      "latency_ms": 692.24,
+      "extracted_preview": "Halaman pertama berisi teks digital asli tentang metode penelitian kuantitatif.\n\nPenelitian kemiripan dokumen akademik berbasis korpus lokal di perguruan tinggi menjaga integritas "
+    },
+    {
+      "scenario": "4_low_quality_noisy_blurred_scan",
+      "extraction_method": "OCR",
+      "ocr_pages": [
+        1
+      ],
+      "extraction_confidence": 0.9436,
+      "word_recall": 1.0,
+      "extracted_chars": 95,
+      "latency_ms": 791.42,
+      "extracted_preview": "Evaluasi mutu arsip pindaian berkualitas rendah tetap terbaca menggunakan prapemrosesan gambar."
+    },
+    {
+      "scenario": "5_native_digital_pdf_regression",
+      "extraction_method": "TEXT",
+      "ocr_pages": [],
+      "extraction_confidence": 1.0,
+      "word_recall": 1.0,
+      "extracted_chars": 56,
+      "latency_ms": 76.56,
+      "extracted_preview": "Dokumen PDF teks digital murni berjalan cepat tanpa OCR."
+    }
+  ]
+}

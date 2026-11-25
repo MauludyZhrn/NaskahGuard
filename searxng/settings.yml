@@ -1,0 +1,17 @@
+# Konfigurasi SearXNG lokal untuk NaskahGuard (mengaktifkan format JSON hanya di localhost)
+use_default_settings: true
+
+server:
+  secret_key: "ganti-secret-acak-lokal-anda"
+  limiter: false
+  image_proxy: false
+  bind_address: "0.0.0.0"
+  port: 8080
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "auto"
+  formats:
+    - html
+    - json

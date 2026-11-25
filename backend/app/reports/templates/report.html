@@ -189,12 +189,50 @@
       <div>No. Laporan {{ report.report_number }}</div>
     </div>
     <div class="eyebrow">Deteksi Pola Tulisan AI (Terpisah dari Plagiasi)</div>
+    <p class="muted" style="margin-top: 0;">Dokumen dianalisis: <strong>{{ report.document.title }}</strong></p>
     <div>
       <span class="hero-score">{% if report.ai_report.ai_likelihood_pct is not none %}{{ "%.1f"|format(report.ai_report.ai_likelihood_pct) }}%{% else %}Kurang Bukti{% endif %}</span>
       <span class="hero-label">{{ report.ai_report.classification_label }}</span>
     </div>
+    <p class="muted">
+      Tingkat Keyakinan: <strong>{{ report.ai_report.confidence_label }}</strong>
+      {% if report.ai_report.uncertainty_pct is not none %} · Ketidakpastian ±{{ "%.1f"|format(report.ai_report.uncertainty_pct) }}%{% endif %}
+      {% if report.ai_report.calibration and report.ai_report.calibration.calibrated %} · Terkalibrasi (T={{ report.ai_report.calibration.temperature }}){% endif %}
+    </p>
     <p>{{ report.ai_report.summary_id }}</p>
+    {% set ps = report.ai_report.paragraph_summary %}
+    {% if ps %}
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0;">
+      <div class="stat-card" style="padding: 10px 12px; line-height: 1.4;"><div class="detail-label">Total Paragraf</div><div>{{ ps.total_paragraphs }}</div></div>
+      <div class="stat-card" style="padding: 10px 12px; line-height: 1.4;"><div class="detail-label">Indikasi AI</div><div style="color: var(--burgundy);">{{ ps.ai_likely_count }}</div></div>
+      <div class="stat-card" style="padding: 10px 12px; line-height: 1.4;"><div class="detail-label">Indikasi Manusia</div><div style="color: #15803d;">{{ ps.human_likely_count }}</div></div>
+      <div class="stat-card" style="padding: 10px 12px; line-height: 1.4;"><div class="detail-label">Tidak Pasti / Pendek</div><div>{{ ps.uncertain_count + ps.insufficient_count }}</div></div>
+    </div>
+    {% endif %}
     <div class="callout">{{ report.ai_report.disclaimer }}</div>
+    {% if report.ai_report.limitations %}
+    <ul class="muted" style="margin-top: 10px; padding-left: 18px;">
+      {% for lim in report.ai_report.limitations %}
+      <li>{{ lim }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if report.ai_report.paragraphs %}
+    <h2>Highlight Analisis per Paragraf</h2>
+    {% for p in report.ai_report.paragraphs %}
+      {% set bg = '#fbf0f2' if p.classification == 'AI_LIKELY' else ('#fef8ec' if p.classification == 'MIXED_UNCERTAIN' else ('#f1faf4' if p.classification == 'HUMAN_LIKELY' else '#f5f2ed')) %}
+      <div style="background: {{ bg }}; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 6px;">
+          <span>Paragraf {{ p.paragraph_index + 1 }} ({{ p.word_count }} kata) — {{ p.classification_label }}</span>
+          <span>{% if p.ai_likelihood_pct is not none %}{{ "%.1f"|format(p.ai_likelihood_pct) }}%{% else %}-{% endif %}</span>
+        </div>
+        <div class="doc-text" style="font-size: 13.5px;">{{ p.text }}</div>
+        {% if p.reasons %}
+        <div class="muted" style="margin-top: 6px; font-size: 12px;">{{ p.reasons | join(" · ") }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+    {% endif %}
   </section>
   {% endif %}
 

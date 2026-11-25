@@ -392,6 +392,23 @@ export const ReportDetailPage: React.FC = () => {
                   ) : null}
                   <span>Selesai: {formatDateId(report.finished_at || report.created_at)}</span>
                   <span>Durasi: {formatDuration(report.duration_seconds)}</span>
+                  <span className="inline-flex items-center gap-1">
+                    Ekstraksi:{" "}
+                    <strong className="font-medium text-foreground">
+                      {report.document.extraction_method === "OCR"
+                        ? `OCR (${report.document.ocr_pages?.length || 0} hlm)`
+                        : report.document.extraction_method === "MIXED"
+                        ? `Teks + OCR (${report.document.ocr_pages?.length || 0} hlm)`
+                        : report.document.extraction_method === "OCR_UNAVAILABLE"
+                        ? "Pindaian (OCR Nonaktif)"
+                        : "Teks Langsung"}
+                    </strong>
+                    {typeof report.document.extraction_confidence === "number" ? (
+                      <span className="tabular-nums">
+                        ({Math.round(report.document.extraction_confidence * 100)}%)
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
               </div>
 
@@ -1424,22 +1441,76 @@ export const ReportDetailPage: React.FC = () => {
                   <p className="max-w-2xl text-sm text-muted-foreground">{aiReport.summary_id}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 md:min-w-[300px]">
+                <div className="grid grid-cols-2 gap-3 md:min-w-[320px]">
                   <div className="rounded-md border border-border p-3">
                     <span className="text-xs text-muted-foreground">Tingkat Keyakinan</span>
                     <p className="mt-1 text-sm font-semibold text-foreground">{aiReport.confidence_label}</p>
+                    {aiReport.calibration?.calibrated && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                        Terkalibrasi (T={aiReport.calibration.temperature})
+                      </p>
+                    )}
                   </div>
                   <div className="rounded-md border border-border p-3">
                     <span className="text-xs text-muted-foreground">Bahasa Terdeteksi</span>
                     <p className="mt-1 text-sm font-semibold text-foreground">{aiReport.language.label}</p>
                   </div>
                   <div className="rounded-md border border-border p-3 col-span-2">
-                    <span className="text-xs text-muted-foreground">Model Analisis Aktif</span>
-                    <p className="mt-0.5 text-xs font-medium text-foreground">{aiReport.model_used}</p>
+                    <span className="text-xs text-muted-foreground">Dokumen &amp; Model Aktif</span>
+                    <p className="mt-0.5 truncate text-xs font-medium text-foreground">
+                      {report.document.title || report.document.filename} · {aiReport.model_used}
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Clear Paragraph Classification Summary Tiles */}
+            {(() => {
+              const ps = aiReport.paragraph_summary || {
+                total_paragraphs: aiReport.paragraphs.length,
+                ai_likely_count: aiReport.paragraphs.filter((p) => p.classification === "AI_LIKELY").length,
+                human_likely_count: aiReport.paragraphs.filter((p) => p.classification === "HUMAN_LIKELY").length,
+                uncertain_count: aiReport.paragraphs.filter((p) => p.classification === "MIXED_UNCERTAIN").length,
+                insufficient_count: aiReport.paragraphs.filter((p) => p.classification === "INSUFFICIENT_DATA").length,
+              };
+              return (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Card className="shadow-none">
+                    <CardContent className="p-4">
+                      <span className="text-xs text-muted-foreground">Jumlah Paragraf</span>
+                      <p className="mt-1 font-serif text-2xl font-bold tabular-nums text-foreground">
+                        {ps.total_paragraphs}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="shadow-none">
+                    <CardContent className="p-4">
+                      <span className="text-xs text-muted-foreground">Paragraf Indikasi AI</span>
+                      <p className="mt-1 font-serif text-2xl font-bold tabular-nums text-primary">
+                        {ps.ai_likely_count}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="shadow-none">
+                    <CardContent className="p-4">
+                      <span className="text-xs text-muted-foreground">Paragraf Indikasi Manusia</span>
+                      <p className="mt-1 font-serif text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        {ps.human_likely_count}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="shadow-none">
+                    <CardContent className="p-4">
+                      <span className="text-xs text-muted-foreground">Tidak Pasti / Singkat</span>
+                      <p className="mt-1 font-serif text-2xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                        {ps.uncertain_count + ps.insufficient_count}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card className="shadow-none lg:col-span-2">
@@ -1463,9 +1534,11 @@ export const ReportDetailPage: React.FC = () => {
                             active
                               ? "border-primary bg-primary/5"
                               : p.classification === "AI_LIKELY"
-                              ? "border-destructive/35 bg-destructive/5"
+                              ? "border-destructive/40 bg-destructive/5"
                               : p.classification === "MIXED_UNCERTAIN"
-                              ? "border-[color:var(--lexical-border)]/50 bg-[var(--lexical-bg)]/40"
+                              ? "border-amber-500/40 bg-amber-500/5"
+                              : p.classification === "HUMAN_LIKELY"
+                              ? "border-emerald-600/30 bg-emerald-500/5"
                               : "border-border bg-card hover:bg-accent/40"
                           }`}
                         >

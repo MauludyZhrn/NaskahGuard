@@ -574,6 +574,13 @@ def _build_front_matter_pdf(
         story.append(PageBreak())
         story.append(_SectionMarker("Laporan Deteksi Tulisan AI"))
         story.append(Paragraph("LAPORAN TERPISAH — DETEKSI POLA TULISAN AI", eyebrow_style))
+        story.append(
+            Paragraph(
+                f"Dokumen dianalisis: <b>{_safe_pdf_text(doc_info.get('title') or doc_info.get('filename'))}</b>",
+                muted_style,
+            )
+        )
+        story.append(Spacer(1, 0.15 * cm))
         ai_pct = ai_rep.get("ai_likelihood_pct")
         score_disp = f"{ai_pct:.1f}%" if ai_pct is not None else "Tidak Cukup Bukti"
         story.append(
@@ -582,42 +589,106 @@ def _build_front_matter_pdf(
                 score_big_style,
             )
         )
+        cal_info = ai_rep.get("calibration") or {}
+        conf_lbl = _safe_pdf_text(ai_rep.get("confidence_label", "-"))
+        unc_val = ai_rep.get("uncertainty_pct")
+        unc_txt = f" · Ketidakpastian +/-{unc_val:.1f}%" if unc_val is not None else ""
+        cal_txt = (
+            f" · Kalibrasi: T={cal_info.get('temperature', 1.3)}"
+            if cal_info.get("calibrated")
+            else ""
+        )
+        story.append(Paragraph(f"Tingkat Keyakinan: <b>{conf_lbl}</b>{unc_txt}{cal_txt}", muted_style))
+        story.append(Spacer(1, 0.15 * cm))
         story.append(Paragraph(_safe_pdf_text(ai_rep.get("summary_id", "")), body_style))
-        story.append(Spacer(1, 0.3 * cm))
-        story.append(Paragraph(f"<i>Catatan Penting: {_safe_pdf_text(ai_rep.get('disclaimer', ''))}</i>", muted_style))
-        story.append(Spacer(1, 0.35 * cm))
-        story.append(HRFlowable(width="100%", thickness=0.6, color=COL_BORDER, spaceAfter=8))
+        story.append(Spacer(1, 0.25 * cm))
 
         paras = ai_rep.get("paragraphs") or []
+        ps = ai_rep.get("paragraph_summary") or {
+            "total_paragraphs": len(paras),
+            "ai_likely_count": sum(1 for p in paras if p.get("classification") == "AI_LIKELY"),
+            "human_likely_count": sum(1 for p in paras if p.get("classification") == "HUMAN_LIKELY"),
+            "uncertain_count": sum(1 for p in paras if p.get("classification") == "MIXED_UNCERTAIN"),
+            "insufficient_count": sum(1 for p in paras if p.get("classification") == "INSUFFICIENT_DATA"),
+        }
+        ai_stat_tbl = Table(
+            [
+                [
+                    Paragraph("<b>Total Paragraf</b>", muted_style),
+                    Paragraph("<b>Indikasi AI</b>", muted_style),
+                    Paragraph("<b>Indikasi Manusia</b>", muted_style),
+                    Paragraph("<b>Tidak Pasti / Pendek</b>", muted_style),
+                ],
+                [
+                    Paragraph(f"<b>{ps.get('total_paragraphs', 0)}</b>", stat_style),
+                    Paragraph(f'<font color="#6E1F2F"><b>{ps.get("ai_likely_count", 0)}</b></font>', stat_style),
+                    Paragraph(f'<font color="#15803D"><b>{ps.get("human_likely_count", 0)}</b></font>', stat_style),
+                    Paragraph(f"<b>{int(ps.get('uncertain_count', 0)) + int(ps.get('insufficient_count', 0))}</b>", stat_style),
+                ],
+            ],
+            colWidths=[4.2 * cm, 4.2 * cm, 4.2 * cm, 4.2 * cm],
+        )
+        ai_stat_tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), COL_IVORY),
+                    ("BOX", (0, 0), (-1, -1), 0.6, COL_BORDER),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.4, COL_BORDER),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+        story.append(ai_stat_tbl)
+        story.append(Spacer(1, 0.25 * cm))
+        story.append(Paragraph(f"<i>Catatan Penting: {_safe_pdf_text(ai_rep.get('disclaimer', ''))}</i>", muted_style))
+        lims = ai_rep.get("limitations") or []
+        if lims:
+            story.append(Spacer(1, 0.15 * cm))
+            story.append(
+                Paragraph(
+                    "Keterbatasan Deteksi: " + " ".join(_safe_pdf_text(x) for x in lims[:3]),
+                    muted_style,
+                )
+            )
+        story.append(Spacer(1, 0.3 * cm))
+        story.append(HRFlowable(width="100%", thickness=0.6, color=COL_BORDER, spaceAfter=8))
+
         if paras:
-            story.append(Paragraph("Ringkasan Analisis per Paragraf", h2_style))
-            p_rows = [["Prg", "Kata", "Klasifikasi", "Indikasi AI", "Alasan Utama"]]
-            for p in paras[:30]:
+            story.append(Paragraph("Highlight & Ringkasan Analisis per Paragraf", h2_style))
+            p_rows = [["Prg", "Kata", "Klasifikasi", "Indikasi AI", "Cuplikan & Alasan"]]
+            row_styles = [
+                ("BACKGROUND", (0, 0), (-1, 0), COL_IVORY),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.4, COL_BORDER),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+            for r_idx, p in enumerate(paras[:30], start=1):
                 pct_p = f"{p['ai_likelihood_pct']:.1f}%" if p.get("ai_likelihood_pct") is not None else "-"
                 reason = (p.get("reasons") or ["-"])[0]
+                excerpt_p = _safe_pdf_text(str(p.get("text") or "")[:120])
+                cls_code = p.get("classification")
+                if cls_code == "AI_LIKELY":
+                    row_styles.append(("BACKGROUND", (0, r_idx), (-1, r_idx), colors.HexColor("#FBF0F2")))
+                elif cls_code == "MIXED_UNCERTAIN":
+                    row_styles.append(("BACKGROUND", (0, r_idx), (-1, r_idx), colors.HexColor("#FEF8EC")))
+                elif cls_code == "HUMAN_LIKELY":
+                    row_styles.append(("BACKGROUND", (0, r_idx), (-1, r_idx), colors.HexColor("#F1FAF4")))
                 p_rows.append(
                     [
                         str(int(p.get("paragraph_index", 0)) + 1),
                         str(p.get("word_count", 0)),
                         Paragraph(_safe_pdf_text(p.get("classification_label", "-")), muted_style),
                         pct_p,
-                        Paragraph(_safe_pdf_text(reason[:160]), muted_style),
+                        Paragraph(f'"{excerpt_p}..."<br/><font color="#5E544F">{_safe_pdf_text(reason[:140])}</font>', muted_style),
                     ]
                 )
-            t_ai = Table(p_rows, colWidths=[1.1 * cm, 1.3 * cm, 3.6 * cm, 2.0 * cm, 8.8 * cm])
-            t_ai.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), COL_IVORY),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, -1), 8),
-                        ("GRID", (0, 0), (-1, -1), 0.4, COL_BORDER),
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                        ("TOPPADDING", (0, 0), (-1, -1), 4),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                    ]
-                )
-            )
+            t_ai = Table(p_rows, colWidths=[1.0 * cm, 1.2 * cm, 3.4 * cm, 1.9 * cm, 9.3 * cm])
+            t_ai.setStyle(TableStyle(row_styles))
             story.append(t_ai)
 
     # ================= ANNOTATED MANUSCRIPT TEXT PAGES (FOR NON-PDF / FALLBACK) =================

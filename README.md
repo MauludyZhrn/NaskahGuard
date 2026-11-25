@@ -99,3 +99,20 @@ backend\.venv\Scripts\python.exe scripts\smoke_test.py
 - **Engine Deteksi Tulisan AI Lokal (`backend/app/ai_detection/`)**:
   - Engine CPU luring bawaan `ng-id-stylo-lm-v1` (entropi n-gram karakter + *burstiness* + stilometri ID/EN) lengkap dengan analisis per paragraf, batas minimum 80 kata (`INSUFFICIENT_DATA`), manajemen model (`/models`), serta peringatan keterbatasan probabilistik.
 - **Dokumentasi & Skill Phase 10**: [ai-writing-detection](.agents/skills/ai-writing-detection/SKILL.md), [UI_REDESIGN.md](docs/UI_REDESIGN.md), [AI_DETECTION_ARCHITECTURE.md](docs/AI_DETECTION_ARCHITECTURE.md), [AI_DETECTION_BENCHMARK.md](docs/AI_DETECTION_BENCHMARK.md), [AI_DETECTION_LIMITATIONS.md](docs/AI_DETECTION_LIMITATIONS.md), dan [PHASE10_QA_REPORT.md](docs/PHASE10_QA_REPORT.md).
+
+---
+
+## Pembaruan Phase 10.1 & 10.2 — Audit Aktivasi, Validasi AI Independen, OCR Lokal, & Penyelesaian Web Search
+
+- **Validasi Independen AI Detector (`ng-id-stylo-lm-v1`)**:
+  - Dievaluasi pada dataset independen terpisah berdasarkan dokumen & sumber (`100` artikel OA pra-2022 dari DOAJ/Europe PMC termasuk `31` artikel Hukum & Studi Islam Indonesia + `48` sampel independen multikategori + `4` guardrail teks pendek).
+  - Kalibrasi `T = 1.3` dan ambang konservatif `0.68` tervalidasi pada `validation_v2`; held-out `test_v2` mencatat **Precision `1.0000`**, **F1 `0.8571`**, **ROC-AUC `0.9729`**, dan **`0` false positive** pada seluruh naskah manusia/hukum/Islam/terjemahan.
+  - Laporan AI (Web, PDF, HTML) menampilkan ringkasan jumlah paragraf, tingkat keyakinan & kalibrasi, keterbatasan deteksi, serta highlight warna per paragraf yang terpisah dari skor plagiasi.
+- **Kontrol Pencarian Internet, Crawler, & SearXNG Lokal**:
+  - Halaman **Pemeriksaan Baru** menyediakan sakelar eksplisit untuk Pencarian Jurnal, Pencarian Web Umum (default OFF), Browser Crawler Terisolasi (default OFF), dan Pengambilan Full-Text dengan status langsung dari `GET /api/providers`.
+  - Panduan SearXNG lokal menggunakan [docker-compose.searxng.yml](docker-compose.searxng.yml) dan [searxng/settings.yml](searxng/settings.yml) (`NG_SEARXNG_URL=http://127.0.0.1:8080`).
+- **Tesseract OCR Lokal Opsional (`ind+eng`)**:
+  - Auto-discovery biner Tesseract di Windows serta prapemrosesan pindaian berkualitas rendah, teruji pada 5 skenario nyata (scan ID, scan EN, campuran gambar+teks, scan blur/noise, dan regresi PDF digital).
+- **Laporan Institusional & Pengecualian Bibliography**:
+  - Laporan PDF/HTML/Web bergaya institusional Ivory Burgundy dengan pil sumber berwarna di margin kiri, Tanda Integritas (deteksi homoglyph & karakter tersembunyi), serta pengecualian tajuk **Daftar Pustaka / Bibliography / Bibliografi / References / Works Cited**.
+- **Dokumentasi Phase 10.1 & 10.2**: [PHASE10_1_FEATURE_AUDIT.md](docs/PHASE10_1_FEATURE_AUDIT.md), [AI_DETECTION_STATUS.md](docs/AI_DETECTION_STATUS.md), [PHASE10_2_AI_VALIDATION.md](docs/PHASE10_2_AI_VALIDATION.md), [PHASE10_2_WEB_SEARCH.md](docs/PHASE10_2_WEB_SEARCH.md), [PHASE10_2_OCR_REPORT.md](docs/PHASE10_2_OCR_REPORT.md), dan [PHASE10_2_QA_REPORT.md](docs/PHASE10_2_QA_REPORT.md).

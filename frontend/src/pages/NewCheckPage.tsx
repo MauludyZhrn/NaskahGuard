@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
-import { CheckMode, CheckSettings, CheckSummary, DocumentItem, ModelCatalogItem } from "../types";
+import { CheckMode, CheckSettings, CheckSummary, DocumentItem, ModelCatalogItem, ProviderHealthItem } from "../types";
 
 const MODE_OPTIONS: Array<{
   mode: CheckMode;
@@ -107,6 +107,7 @@ export const NewCheckPage: React.FC = () => {
   const [activeCheck, setActiveCheck] = useState<CheckSummary | null>(null);
   const [corpusCount, setCorpusCount] = useState<number | null>(null);
   const [activeModel, setActiveModel] = useState<ModelCatalogItem | null>(null);
+  const [providers, setProviders] = useState<ProviderHealthItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -125,6 +126,9 @@ export const NewCheckPage: React.FC = () => {
         const found = res.models.find((m) => m.id === res.active_model_id) || res.models[0] || null;
         setActiveModel(found);
       })
+      .catch(() => undefined);
+    apiFetch<{ providers: ProviderHealthItem[] }>("/providers")
+      .then((res) => setProviders(res.providers || []))
       .catch(() => undefined);
   }, []);
 
@@ -408,17 +412,17 @@ export const NewCheckPage: React.FC = () => {
                     ))}
                   </div>
 
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex flex-col gap-0.5">
-                        <Label htmlFor="ext-search-toggle" className="font-medium text-foreground">
+                        <Label htmlFor="ext-search-toggle" className="font-medium text-foreground cursor-pointer">
                           <span className="inline-flex items-center gap-1.5">
                             <Globe className="size-3.5 text-muted-foreground" />
-                            Pencarian Internet &amp; Jurnal Terbuka
+                            Aktifkan Pencarian Sumber Eksternal
                           </span>
                         </Label>
                         <span className="text-xs text-muted-foreground">
-                          Cari sumber tambahan dari OpenAlex, Europe PMC, Crossref, arXiv, dan DOAJ.
+                          Nonaktif secara default. Hanya mengirimkan judul &amp; kata kunci terpilih (bukan seluruh naskah).
                         </span>
                       </div>
                       <Switch
@@ -427,6 +431,83 @@ export const NewCheckPage: React.FC = () => {
                         onCheckedChange={(val) => setSettings((s) => ({ ...s, use_external_sources: val }))}
                       />
                     </div>
+
+                    {(() => {
+                      const academicReady = providers.filter((p) => p.type === "academic" && p.configured).length;
+                      const webReady = providers.some((p) => p.type === "web" && p.configured);
+                      const pwProv = providers.find((p) => p.id === "playwright_crawler");
+                      const pwReady = Boolean(pwProv?.configured);
+                      const webSubSwitches = [
+                        {
+                          key: "enable_academic_search",
+                          label: "Aktifkan Pencarian Jurnal & Repositori Ilmiah",
+                          hint: academicReady > 0
+                            ? `${academicReady} penyedia terbuka terkonfigurasi (OpenAlex, Europe PMC, DOAJ, arXiv, Crossref)`
+                            : "OpenAlex, Europe PMC, DOAJ, arXiv, Crossref",
+                          statusBadge: academicReady > 0 ? "Terkonfigurasi" : "Memuat...",
+                          badgeVariant: "secondary" as const,
+                        },
+                        {
+                          key: "enable_web_search",
+                          label: "Aktifkan Pencarian Web Umum",
+                          hint: webReady
+                            ? "SearXNG / Web API terkonfigurasi di backend"
+                            : "Memerlukan SearXNG lokal (docker-compose.searxng.yml) atau NG_WEB_SEARCH_API_URL",
+                          statusBadge: webReady ? "Siap" : "Belum Dikonfigurasi",
+                          badgeVariant: (webReady ? "secondary" : "outline") as "secondary" | "outline",
+                        },
+                        {
+                          key: "enable_browser_crawler",
+                          label: "Aktifkan Browser Crawler Terisolasi",
+                          hint: pwProv?.status || "Chromium headless ephemeral tanpa profil/cookie pribadi",
+                          statusBadge: pwReady ? "Playwright Siap" : "Belum Terpasang",
+                          badgeVariant: (pwReady ? "secondary" : "outline") as "secondary" | "outline",
+                        },
+                        {
+                          key: "enable_fulltext_download",
+                          label: "Aktifkan Pengambilan Full-Text",
+                          hint: "Mengunduh & mengindeks teks penuh PDF/HTML/XML terbuka ke korpus lokal",
+                          statusBadge: "Aktif",
+                          badgeVariant: "secondary" as const,
+                        },
+                      ];
+                      return (
+                        <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-muted/25 p-3">
+                          {webSubSwitches.map((item) => (
+                            <div key={item.key} className="flex items-start justify-between gap-3">
+                              <div className="flex flex-col gap-0.5 min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Label
+                                    htmlFor={item.key}
+                                    className="text-xs font-medium text-foreground cursor-pointer"
+                                  >
+                                    {item.label}
+                                  </Label>
+                                  <Badge variant={item.badgeVariant} className="text-[10px] py-0 px-1.5">
+                                    {item.statusBadge}
+                                  </Badge>
+                                </div>
+                                <span className="text-[11px] leading-snug text-muted-foreground">{item.hint}</span>
+                              </div>
+                              <Switch
+                                id={item.key}
+                                checked={Boolean((settings as any)[item.key])}
+                                onCheckedChange={(val) =>
+                                  setSettings((s) => ({
+                                    ...s,
+                                    [item.key]: val,
+                                    use_external_sources:
+                                      val && (item.key === "enable_web_search" || item.key === "enable_academic_search")
+                                        ? true
+                                        : s.use_external_sources,
+                                  }))
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex flex-col gap-2">
                       <Label>Kedalaman Pencarian Eksternal</Label>

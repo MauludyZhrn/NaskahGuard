@@ -177,7 +177,7 @@ def _build_provider_list(db: Session) -> list[dict[str, Any]]:
             "default_enabled": searx.is_configured(),
             "full_text_capable": True,
             "rate_limit": "Mengikuti instance SearXNG lokal/pribadi",
-            "status": searx.status_message() if searx.is_configured() else "NOT_CONFIGURED (Atur NG_SEARXNG_BASE_URL / docker-compose.searxng.yml)",
+            "status": searx.status_message() if searx.is_configured() else "NOT_CONFIGURED (Atur NG_SEARXNG_URL / docker-compose.searxng.yml)",
         }, searx.is_configured()),
         _enrich({
             "id": "web_api",

@@ -121,3 +121,26 @@ Laporan log pengembangan proyek **NaskahGuard** (Academic Plagiarism & Similarit
    - Benchmark Plagiasi (12 skenario): **Precision `1,0000`**, **Recall `1,0000`**, **F1 `1,0000`**, **FPR `0,0000`**.
    - Benchmark AI ID+EN (`test` n=72): **ROC-AUC `0,9537`**, **F1 (`p>=0,68`) `0,8529`**, **`strict_ai_likely_fpr = 0,0`**, rata-rata **`1,17 ms`/dokumen**; seluruh 5 uji ketahanan *false positive* & batas `< 80` kata lulus.
    - Pemeriksaan emoji UI: **`0` temuan**; TypeScript & Vite `npm run build`: **exit 0**; Playwright UI QA 17 pengecekan (`1440×900`, `768×1024`, `390×844`, Light & Dark): **17/17 lulus (`0` overflow, `0` console error)** dengan bukti screenshot *before/after*.
+
+
+---
+
+## Phase 10.1 & 10.2 — Feature Activation Audit, Independent AI Validation, Local OCR & Web Search Completion
+
+### Ringkasan Perubahan & Verifikasi Aktual
+1. **Audit Aktivasi Fitur Phase 10.1**:
+   - Mendokumentasikan status jujur 15 fitur pada [PHASE10_1_FEATURE_AUDIT.md](docs/PHASE10_1_FEATURE_AUDIT.md), [AI_DETECTION_STATUS.md](docs/AI_DETECTION_STATUS.md), dan [PHASE10_1_TEST_RESULTS.md](docs/PHASE10_1_TEST_RESULTS.md).
+2. **Validasi Independen AI Detector (`ng-id-stylo-lm-v1`)**:
+   - Membangun dataset evaluasi independen terpisah berdasarkan `document_id` dan `source_id` (`benchmark/data/ai_detection_v2/`: `100` artikel OA pra-2022 nyata dari DOAJ & Europe PMC termasuk `31` artikel Hukum & Studi Islam Indonesia + `48` dokumen independen multikategori + `4` guardrail teks pendek).
+   - Audit kalibrasi pada `validation_v2` mengonfirmasi `T = 1.3` (NLL terendah `0.2303`) dan ambang konservatif `0.68`; pada held-out `test_v2` (`n = 87`): **Precision `1.0000`**, **Recall `0.7500`**, **F1 `0.8571`**, **FPR `0.0000`**, **ROC-AUC `0.9729`**, **ECE `0.0314`**, dengan **`0` false positive** pada seluruh artikel Hukum/Islam/Formal/Terjemahan.
+   - Laporan AI (Web, PDF, HTML) ditingkatkan dengan ringkasan jumlah paragraf (`Total`, `Indikasi AI`, `Indikasi Manusia`, `Tidak Pasti / Singkat`), status kalibrasi, highlight per paragraf, serta penolakan HTTP `400` untuk `ai_model_id` yang belum terpasang.
+3. **Penyelesaian Internet Search, Browser Crawler, & SearXNG**:
+   - Menambahkan 4 sakelar kontrol pada `/new-check` (`Pencarian Jurnal`, `Pencarian Web Umum` default OFF, `Browser Crawler Terisolasi` default OFF, `Pengambilan Full-Text`) dengan status nyata dari `GET /api/providers`.
+   - Memperbaiki [docker-compose.searxng.yml](docker-compose.searxng.yml) + menambahkan [searxng/settings.yml](searxng/settings.yml) (`formats: [html, json]`) dan memperbaiki pesan `NG_SEARXNG_URL` di `providers.py`.
+   - Verifikasi live publik end-to-end (`benchmark/run_phase10_2_live_web_e2e.py`, `0` korpus lokal awal): mengunduh & mengindeks **5 PDF arXiv nyata**, memverifikasi sumber cocok #1 (`MATCH_VERIFIED`, **`SI = 63.64%`**, `63/99` kata) dalam `15.65 detik`.
+4. **Tesseract OCR Lokal (`v5.4.0.20240606`, `ind+eng`)**:
+   - Meningkatkan `backend/app/ingestion/ocr.py` (auto-discovery Windows + prapemrosesan pindaian blur/noise) dan menampilkan status OCR serta `extraction_confidence` di UI Pengaturan & Detail Laporan.
+   - Lolos **5/5 skenario OCR nyata** (`run_phase10_2_ocr_eval.py`: Scan ID `94.3%`, Scan EN `92.6%`, Mixed `94.3%`, Low-Quality `94.4%`, Digital PDF `100%`, seluruhnya `word_recall = 1.0`).
+5. **QA Regresi Penuh**:
+   - `pytest`: **42 passed, 1 skipped, 0 failed** (`12.35s`); `LIVE_NETWORK_TESTS=true`: **1 passed** (`23.89s`); `npm run build`: **exit 0** (`6.61s`); Playwright UI QA: **17/17 lulus** (`0` error, `0` overflow).
+   - Dokumentasi lengkap: [PHASE10_2_AI_VALIDATION.md](docs/PHASE10_2_AI_VALIDATION.md), [PHASE10_2_WEB_SEARCH.md](docs/PHASE10_2_WEB_SEARCH.md), [PHASE10_2_OCR_REPORT.md](docs/PHASE10_2_OCR_REPORT.md), dan [PHASE10_2_QA_REPORT.md](docs/PHASE10_2_QA_REPORT.md).
