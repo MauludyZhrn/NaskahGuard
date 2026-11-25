@@ -2,17 +2,33 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit import log_audit
 from app.db import get_db
-from app.models import OAIHarvestLog, OAIHarvestRecord, OAIRepository
+from app.models import (
+    CheckSource,
+    Document,
+    OAIHarvestLog,
+    OAIHarvestRecord,
+    OAIHarvestRun,
+    OAIRepository,
+    RepositoryCatalogEntry,
+)
 from app.security import enforce_rate_limit, require_auth
+from app.sources.oai_catalog import (
+    add_catalog_entry,
+    ensure_catalog_seeded,
+    promote_catalog_entry_to_personal,
+    serialize_catalog_entry,
+    test_catalog_entry,
+)
 from app.sources.oai_pmh import (
     OFFICIAL_REFERENCE_ENDPOINTS,
     OAIPMHProtocolError,
@@ -40,6 +56,11 @@ class OAIRepoCreate(BaseModel):
     enabled: bool = True
     rate_limit_delay_sec: float = Field(default=0.8, ge=0.0, le=30.0)
     request_timeout_sec: int = Field(default=20, ge=5, le=120)
+    year_from: int | None = Field(default=None, ge=1900, le=2100)
+    year_to: int | None = Field(default=None, ge=1900, le=2100)
+    keyword_filter: str | None = Field(default=None, max_length=255)
+    doc_type_filter: str | None = Field(default=None, max_length=128)
+    max_downloads: int = Field(default=10, ge=0, le=200)
     test_report: dict[str, Any] | None = None
 
 
@@ -52,6 +73,29 @@ class OAIRepoUpdate(BaseModel):
     enabled: bool | None = None
     rate_limit_delay_sec: float | None = Field(default=None, ge=0.0, le=30.0)
     request_timeout_sec: int | None = Field(default=None, ge=5, le=120)
+    year_from: int | None = Field(default=None, ge=1900, le=2100)
+    year_to: int | None = Field(default=None, ge=1900, le=2100)
+    keyword_filter: str | None = Field(default=None, max_length=255)
+    doc_type_filter: str | None = Field(default=None, max_length=128)
+    max_downloads: int | None = Field(default=None, ge=0, le=200)
+
+
+class OAIScheduleUpdate(BaseModel):
+    schedule_enabled: bool = False
+    schedule_interval_hours: int = Field(default=24, ge=1, le=720)
+
+
+class OAICatalogCreateRequest(BaseModel):
+    university: str = Field(..., min_length=2, max_length=255)
+    name: str = Field(..., min_length=2, max_length=255)
+    base_url: str = Field(..., min_length=8, max_length=1024)
+    platform: str = Field(default="other", max_length=32)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class OAICatalogAddPersonalRequest(BaseModel):
+    selected_set: str | None = Field(default=None, max_length=255)
+    metadata_prefix: str | None = Field(default=None, max_length=64)
 
 
 class OAIAutoDetectRequest(BaseModel):
@@ -74,11 +118,17 @@ class OAIPreviewRequest(BaseModel):
 
 class OAIHarvestRequest(BaseModel):
     max_records: int = Field(default=15, ge=1, le=200)
+    max_downloads: int | None = Field(default=None, ge=0, le=200)
     download_pdfs: bool = True
     resume: bool = False
     reset_cursor: bool = False
+    incremental: bool = True
     set_spec: str | None = Field(default=None, max_length=255)
     metadata_prefix: str | None = Field(default=None, max_length=64)
+    year_from: int | None = Field(default=None, ge=1900, le=2100)
+    year_to: int | None = Field(default=None, ge=1900, le=2100)
+    keyword_filter: str | None = Field(default=None, max_length=255)
+    doc_type_filter: str | None = Field(default=None, max_length=128)
 
 
 class OAIRetryRequest(BaseModel):
@@ -124,11 +174,41 @@ def _serialize_repo(r: OAIRepository, db: Session | None = None) -> dict[str, An
         "failed_records_count": r.failed_records_count,
         "rate_limit_delay_sec": r.rate_limit_delay_sec,
         "request_timeout_sec": r.request_timeout_sec,
+        "year_from": r.year_from,
+        "year_to": r.year_to,
+        "keyword_filter": r.keyword_filter,
+        "doc_type_filter": r.doc_type_filter,
+        "max_downloads": r.max_downloads,
+        "schedule_enabled": bool(r.schedule_enabled),
+        "schedule_interval_hours": r.schedule_interval_hours or 24,
+        "next_scheduled_at": r.next_scheduled_at.isoformat() if r.next_scheduled_at else None,
         "funnel": funnel,
         "status": r.status,
         "last_error": r.last_error,
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+    }
+
+
+def _serialize_run(run: OAIHarvestRun) -> dict[str, Any]:
+    return {
+        "id": run.id,
+        "repository_id": run.repository_id,
+        "trigger_mode": run.trigger_mode,
+        "status": run.status,
+        "set_spec": run.set_spec,
+        "metadata_prefix": run.metadata_prefix,
+        "filters_snapshot": run.filters_snapshot or {},
+        "records_scanned": run.records_scanned,
+        "records_matched_filter": run.records_matched_filter,
+        "records_harvested": run.records_harvested,
+        "fulltext_indexed": run.fulltext_indexed,
+        "metadata_only": run.metadata_only,
+        "failed_records": run.failed_records,
+        "duplicates_skipped": run.duplicates_skipped,
+        "error_message": run.error_message,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
     }
 
 
@@ -145,6 +225,8 @@ def _serialize_record(rec: OAIHarvestRecord) -> dict[str, Any]:
         "authors": rec.authors or [],
         "year": rec.year,
         "doi": rec.doi,
+        "doc_type": rec.doc_type,
+        "subjects": rec.subjects or [],
         "rights": rec.rights,
         "landing_urls": rec.landing_urls or [],
         "pdf_urls": rec.pdf_urls or [],
@@ -176,6 +258,98 @@ def _serialize_log(log: OAIHarvestLog) -> dict[str, Any]:
 def get_reference_endpoints() -> list[dict[str, str]]:
     """Return official public OAI-PMH endpoints suitable for testing (never fabricated campus URLs)."""
     return OFFICIAL_REFERENCE_ENDPOINTS
+
+
+@router.get("/catalog")
+def list_repository_catalog(
+    q: str | None = Query(default=None),
+    platform: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """List searchable Indonesian & public academic repository discovery catalog."""
+    ensure_catalog_seeded(db)
+    query = db.query(RepositoryCatalogEntry)
+    if platform and platform != "ALL":
+        query = query.filter(RepositoryCatalogEntry.platform == normalize_repo_type(platform))
+    if status_filter and status_filter != "ALL":
+        query = query.filter(RepositoryCatalogEntry.oai_status == status_filter)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            (RepositoryCatalogEntry.university.ilike(like))
+            | (RepositoryCatalogEntry.name.ilike(like))
+            | (RepositoryCatalogEntry.base_url.ilike(like))
+        )
+    entries = query.order_by(RepositoryCatalogEntry.university.asc(), RepositoryCatalogEntry.name.asc()).all()
+    personal_urls = {row[0] for row in db.query(OAIRepository.base_url).all()}
+    return {
+        "total": len(entries),
+        "items": [serialize_catalog_entry(e, personal_urls=personal_urls) for e in entries],
+    }
+
+
+@router.post("/catalog", status_code=status.HTTP_201_CREATED)
+def add_repository_to_catalog(
+    body: OAICatalogCreateRequest,
+    actor: str = Depends(require_auth),
+    _rl: None = Depends(enforce_rate_limit),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    ensure_catalog_seeded(db)
+    try:
+        entry = add_catalog_entry(
+            db,
+            university=body.university,
+            name=body.name,
+            base_url=body.base_url,
+            platform=body.platform,
+            description=body.description,
+        )
+    except SSRFError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    personal_urls = {row[0] for row in db.query(OAIRepository.base_url).all()}
+    log_audit(db, actor=actor, action="ADD_OAI_CATALOG", target_type="oai_catalog", target_id=entry.id)
+    return serialize_catalog_entry(entry, personal_urls=personal_urls)
+
+
+@router.post("/catalog/{catalog_id}/test")
+def test_catalog_repository(
+    catalog_id: str,
+    _rl: None = Depends(enforce_rate_limit),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    entry = db.query(RepositoryCatalogEntry).filter(RepositoryCatalogEntry.id == catalog_id).first()
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Entri katalog repositori tidak ditemukan.")
+    entry, wizard = test_catalog_entry(db, entry)
+    personal_urls = {row[0] for row in db.query(OAIRepository.base_url).all()}
+    return {
+        "entry": serialize_catalog_entry(entry, personal_urls=personal_urls),
+        "wizard": wizard,
+    }
+
+
+@router.post("/catalog/{catalog_id}/add")
+def add_catalog_entry_to_personal(
+    catalog_id: str,
+    body: OAICatalogAddPersonalRequest | None = Body(default=None),
+    actor: str = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    entry = db.query(RepositoryCatalogEntry).filter(RepositoryCatalogEntry.id == catalog_id).first()
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Entri katalog repositori tidak ditemukan.")
+    req = body or OAICatalogAddPersonalRequest()
+    repo, created_new = promote_catalog_entry_to_personal(
+        db,
+        entry,
+        selected_set=req.selected_set,
+        metadata_prefix=req.metadata_prefix,
+    )
+    if created_new:
+        log_audit(db, actor=actor, action="ADD_OAI_REPO_FROM_CATALOG", target_type="oai_repository", target_id=repo.id)
+    return {"created": created_new, "repository": _serialize_repo(repo, db)}
 
 
 @router.post("/auto-detect")
@@ -338,6 +512,16 @@ def update_oai_repository(
         repo.rate_limit_delay_sec = body.rate_limit_delay_sec
     if body.request_timeout_sec is not None:
         repo.request_timeout_sec = body.request_timeout_sec
+    if body.year_from is not None:
+        repo.year_from = body.year_from
+    if body.year_to is not None:
+        repo.year_to = body.year_to
+    if body.keyword_filter is not None:
+        repo.keyword_filter = body.keyword_filter.strip() or None
+    if body.doc_type_filter is not None:
+        repo.doc_type_filter = body.doc_type_filter.strip() or None
+    if body.max_downloads is not None:
+        repo.max_downloads = body.max_downloads
 
     repo.updated_at = datetime.now(timezone.utc)
     db.add(
@@ -465,11 +649,18 @@ def trigger_oai_harvest(
             db,
             repo,
             max_records=req.max_records,
+            max_downloads=req.max_downloads,
             download_pdfs=req.download_pdfs,
             resume=req.resume,
             reset_cursor=req.reset_cursor,
+            incremental=req.incremental,
             set_spec=req.set_spec,
             metadata_prefix=req.metadata_prefix,
+            year_from=req.year_from,
+            year_to=req.year_to,
+            keyword_filter=req.keyword_filter,
+            doc_type_filter=req.doc_type_filter,
+            trigger_mode="MANUAL",
         )
         log_audit(
             db,
@@ -529,11 +720,18 @@ def resume_oai_harvest(
             db,
             repo,
             max_records=req.max_records,
+            max_downloads=req.max_downloads,
             download_pdfs=req.download_pdfs,
             resume=True,
             reset_cursor=False,
+            incremental=req.incremental,
             set_spec=req.set_spec,
             metadata_prefix=req.metadata_prefix,
+            year_from=req.year_from,
+            year_to=req.year_to,
+            keyword_filter=req.keyword_filter,
+            doc_type_filter=req.doc_type_filter,
+            trigger_mode="RESUME",
         )
         log_audit(
             db,
@@ -611,6 +809,126 @@ def list_oai_repository_records(
         "offset": offset,
         "items": [_serialize_record(item) for item in items],
     }
+
+
+@router.put("/repositories/{repo_id}/schedule")
+def update_oai_schedule(
+    repo_id: str,
+    body: OAIScheduleUpdate,
+    actor: str = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    repo = db.query(OAIRepository).filter(OAIRepository.id == repo_id).first()
+    if repo is None:
+        raise HTTPException(status_code=404, detail="Repositori OAI-PMH tidak ditemukan.")
+    repo.schedule_enabled = body.schedule_enabled
+    repo.schedule_interval_hours = body.schedule_interval_hours
+    repo.next_scheduled_at = (
+        datetime.now(timezone.utc) + timedelta(hours=body.schedule_interval_hours)
+        if body.schedule_enabled
+        else None
+    )
+    repo.updated_at = datetime.now(timezone.utc)
+    db.add(
+        OAIHarvestLog(
+            repository_id=repo.id,
+            level="INFO",
+            stage="SCHEDULE_UPDATE",
+            message=(
+                f"Jadwal panen otomatis diaktifkan (setiap {body.schedule_interval_hours} jam)."
+                if body.schedule_enabled
+                else "Jadwal panen otomatis dinonaktifkan."
+            ),
+        )
+    )
+    db.commit()
+    db.refresh(repo)
+    log_audit(db, actor=actor, action="SCHEDULE_OAI_REPO", target_type="oai_repository", target_id=repo.id)
+    return {"repository": _serialize_repo(repo, db)}
+
+
+@router.get("/repositories/{repo_id}/runs")
+def list_oai_harvest_runs(
+    repo_id: str,
+    limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    repo = db.query(OAIRepository).filter(OAIRepository.id == repo_id).first()
+    if repo is None:
+        raise HTTPException(status_code=404, detail="Repositori OAI-PMH tidak ditemukan.")
+    runs = (
+        db.query(OAIHarvestRun)
+        .filter(OAIHarvestRun.repository_id == repo_id)
+        .order_by(OAIHarvestRun.started_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_serialize_run(r) for r in runs]
+
+
+@router.get("/repositories/{repo_id}/indexed-documents")
+def list_oai_indexed_documents(
+    repo_id: str,
+    limit: int = Query(default=100, ge=1, le=300),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Return all locally indexed full-text documents from this repository with full provenance."""
+    repo = db.query(OAIRepository).filter(OAIRepository.id == repo_id).first()
+    if repo is None:
+        raise HTTPException(status_code=404, detail="Repositori OAI-PMH tidak ditemukan.")
+
+    rec_rows = (
+        db.query(OAIHarvestRecord)
+        .filter(
+            OAIHarvestRecord.repository_id == repo_id,
+            OAIHarvestRecord.status == "INDEXED",
+            OAIHarvestRecord.document_id.isnot(None),
+        )
+        .order_by(OAIHarvestRecord.updated_at.desc())
+        .limit(limit)
+        .all()
+    )
+    doc_ids = [r.document_id for r in rec_rows if r.document_id]
+    docs_by_id: dict[str, Document] = {}
+    usage_counts: dict[str, int] = {}
+    if doc_ids:
+        for d in db.query(Document).filter(Document.id.in_(doc_ids)).all():
+            docs_by_id[d.id] = d
+        for sid, cnt in (
+            db.query(CheckSource.source_document_id, func.count(func.distinct(CheckSource.check_id)))
+            .filter(CheckSource.source_document_id.in_(doc_ids))
+            .group_by(CheckSource.source_document_id)
+            .all()
+        ):
+            usage_counts[sid] = int(cnt)
+
+    items: list[dict[str, Any]] = []
+    for r in rec_rows:
+        d = docs_by_id.get(r.document_id or "")
+        if d is None:
+            continue
+        extra = dict(d.extra or {})
+        items.append(
+            {
+                "document_id": d.id,
+                "oai_identifier": r.oai_identifier,
+                "university": extra.get("university") or repo.identified_name or repo.name,
+                "repository_name": extra.get("repository_name") or repo.name,
+                "title": d.title or r.title,
+                "authors": d.authors or r.authors or [],
+                "year": d.year or r.year,
+                "doi": d.doi or r.doi,
+                "doc_type": r.doc_type or extra.get("doc_type"),
+                "url": d.url or d.canonical_url,
+                "license": d.license or r.rights,
+                "retrieved_at": d.retrieved_at.isoformat() if d.retrieved_at else None,
+                "word_count": d.word_count,
+                "page_count": d.page_count,
+                "indexing_status": d.indexing_status,
+                "compared_checks_count": usage_counts.get(d.id, 0),
+            }
+        )
+    return {"total": len(items), "items": items}
 
 
 @router.get("/repositories/{repo_id}/logs")

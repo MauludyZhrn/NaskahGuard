@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -7,6 +7,8 @@ import {
   DownloadCloud,
   ExternalLink,
   FlaskConical,
+  Globe,
+  Library,
   Loader2,
   Pause,
   Pencil,
@@ -51,36 +53,40 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiFetch } from "../api/client";
 import { OAIWizardView } from "../components/OAIWizardView";
 import { PageHeader } from "../components/PageHeader";
 import {
   OAIAutoDetectResult,
   OAIConnectionWizardReport,
-  OAIReferenceEndpoint,
   OAIRepositoryItem,
+  RepositoryCatalogItem,
 } from "../types";
 
 const PLATFORM_OPTIONS = [
   { value: "other", label: "Deteksi Otomatis / OAI-PMH Umum" },
+  { value: "ojs", label: "OJS (/index.php/{jurnal}/oai)" },
   { value: "dspace7", label: "DSpace 7 (/server/oai/request)" },
   { value: "dspace_legacy", label: "DSpace Lama (/oai/request)" },
-  { value: "ojs", label: "OJS (/index.php/{jurnal}/oai)" },
   { value: "eprints", label: "EPrints (/cgi/oai2)" },
   { value: "arxiv", label: "arXiv OAI-PMH" },
 ];
 
-function connectionBadge(repo: OAIRepositoryItem) {
-  if (repo.status === "VERIFIED") {
+function connectionBadge(status: string) {
+  if (status === "VERIFIED") {
     return <Badge variant="default">Terhubung</Badge>;
   }
-  if (repo.status === "ERROR") {
+  if (status === "PARTIAL") {
+    return <Badge variant="secondary">Terhubung (Catatan)</Badge>;
+  }
+  if (status === "ERROR") {
     return <Badge variant="destructive">Kendala Koneksi</Badge>;
   }
-  if (repo.status === "HARVESTING") {
+  if (status === "HARVESTING") {
     return <Badge variant="secondary">Memanen</Badge>;
   }
-  if (repo.status === "PAUSED") {
+  if (status === "PAUSED") {
     return <Badge variant="secondary">Dijeda</Badge>;
   }
   return <Badge variant="outline">Belum Diuji</Badge>;
@@ -97,14 +103,35 @@ function harvestStatusLabel(repo: OAIRepositoryItem) {
 
 export const RepositoriesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("personal");
   const [repos, setRepos] = useState<OAIRepositoryItem[] | null>(null);
-  const [refEndpoints, setRefEndpoints] = useState<OAIReferenceEndpoint[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<OAIRepositoryItem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Add / Wizard dialog state
+  // Catalog state
+  const [catalogItems, setCatalogItems] = useState<RepositoryCatalogItem[] | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogPlatform, setCatalogPlatform] = useState("ALL");
+  const [catalogStatus, setCatalogStatus] = useState("ALL");
+  const [testingCatalogId, setTestingCatalogId] = useState<string | null>(null);
+  const [addingCatalogId, setAddingCatalogId] = useState<string | null>(null);
+  const [catalogWizardResult, setCatalogWizardResult] = useState<{
+    entry: RepositoryCatalogItem;
+    wizard: OAIConnectionWizardReport;
+  } | null>(null);
+
+  // Add to Catalog Modal
+  const [addCatalogOpen, setAddCatalogOpen] = useState(false);
+  const [catUniv, setCatUniv] = useState("");
+  const [catName, setCatName] = useState("");
+  const [catUrl, setCatUrl] = useState("");
+  const [catPlatform, setCatPlatform] = useState("other");
+  const [catDesc, setCatDesc] = useState("");
+  const [savingCat, setSavingCat] = useState(false);
+
+  // Add Personal / Wizard dialog state
   const [addOpen, setAddOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formUrl, setFormUrl] = useState("");
@@ -131,18 +158,29 @@ export const RepositoriesPage: React.FC = () => {
   const [editTimeout, setEditTimeout] = useState("20");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const loadRepos = () => {
+  const loadRepos = useCallback(() => {
     apiFetch<OAIRepositoryItem[]>("/oai/repositories")
       .then(setRepos)
       .catch((err: Error) => setError(err.message));
-  };
+  }, []);
+
+  const loadCatalog = useCallback(() => {
+    const qs = new URLSearchParams();
+    if (catalogQuery.trim()) qs.set("q", catalogQuery.trim());
+    if (catalogPlatform !== "ALL") qs.set("platform", catalogPlatform);
+    if (catalogStatus !== "ALL") qs.set("status", catalogStatus);
+    apiFetch<{ items: RepositoryCatalogItem[] }>(`/oai/catalog?${qs.toString()}`)
+      .then((res) => setCatalogItems(res.items))
+      .catch((err: Error) => setError(err.message));
+  }, [catalogQuery, catalogPlatform, catalogStatus]);
 
   useEffect(() => {
     loadRepos();
-    apiFetch<OAIReferenceEndpoint[]>("/oai/reference-endpoints")
-      .then(setRefEndpoints)
-      .catch(() => undefined);
-  }, []);
+  }, [loadRepos]);
+
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
 
   const resetAddModal = () => {
     setFormName("");
@@ -155,18 +193,6 @@ export const RepositoriesPage: React.FC = () => {
     setDetectResult(null);
     setWizardReport(null);
     setModalError(null);
-  };
-
-  const openAddWithPreset = (preset?: OAIReferenceEndpoint) => {
-    resetAddModal();
-    if (preset) {
-      setFormName(preset.name);
-      setFormUrl(preset.base_url);
-      setFormType(preset.platform || "other");
-      setFormPrefix(preset.metadata_prefix || "oai_dc");
-      setFormSet(preset.default_set || "");
-    }
-    setAddOpen(true);
   };
 
   const handleAutoDetect = async () => {
@@ -253,12 +279,89 @@ export const RepositoriesPage: React.FC = () => {
       });
       setAddOpen(false);
       resetAddModal();
-      setMessage("Repositori akademik OAI-PMH berhasil ditambahkan.");
+      setMessage("Repositori akademik OAI-PMH berhasil ditambahkan ke daftar pribadi.");
       loadRepos();
+      loadCatalog();
     } catch (err: any) {
       setModalError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestCatalog = async (entry: RepositoryCatalogItem) => {
+    setTestingCatalogId(entry.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await apiFetch<{ entry: RepositoryCatalogItem; wizard: OAIConnectionWizardReport }>(
+        `/oai/catalog/${entry.id}/test`,
+        { method: "POST" }
+      );
+      setCatalogWizardResult(res);
+      setMessage(
+        `Hasil uji konektivitas ${res.entry.university}: status ${res.entry.oai_status} (${res.entry.collections_count} koleksi, ${res.entry.supported_formats.length} format metadata).`
+      );
+      loadCatalog();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setTestingCatalogId(null);
+    }
+  };
+
+  const handleAddFromCatalog = async (entry: RepositoryCatalogItem) => {
+    setAddingCatalogId(entry.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await apiFetch<{ created: boolean; repository: OAIRepositoryItem }>(
+        `/oai/catalog/${entry.id}/add`,
+        { method: "POST" }
+      );
+      setMessage(
+        res.created
+          ? `${entry.name} ditambahkan ke Daftar Repositori Pribadi.`
+          : `${entry.name} sudah ada pada Daftar Repositori Pribadi.`
+      );
+      loadRepos();
+      loadCatalog();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setAddingCatalogId(null);
+    }
+  };
+
+  const handleSaveCatalogEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catUniv.trim() || !catName.trim() || !catUrl.trim()) return;
+    setSavingCat(true);
+    setError(null);
+    try {
+      await apiFetch("/oai/catalog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          university: catUniv.trim(),
+          name: catName.trim(),
+          base_url: catUrl.trim(),
+          platform: catPlatform,
+          description: catDesc.trim() || null,
+        }),
+      });
+      setAddCatalogOpen(false);
+      setCatUniv("");
+      setCatName("");
+      setCatUrl("");
+      setCatPlatform("other");
+      setCatDesc("");
+      setMessage("Repositori ditambahkan ke katalog dengan status Belum Diuji. Klik 'Uji Konektivitas' untuk memverifikasi.");
+      loadCatalog();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSavingCat(false);
     }
   };
 
@@ -336,7 +439,12 @@ export const RepositoriesPage: React.FC = () => {
       }>(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ max_records: 15, download_pdfs: true, resume }),
+        body: JSON.stringify({
+          max_records: 15,
+          max_downloads: repo.max_downloads ?? 10,
+          download_pdfs: true,
+          resume,
+        }),
       });
       setMessage(
         `Panen ${repo.name} selesai: ${res.summary?.records_harvested ?? 0} rekaman diproses, ${res.summary?.fulltext_indexed ?? 0} full-text diindeks ke korpus lokal.`
@@ -371,6 +479,7 @@ export const RepositoriesPage: React.FC = () => {
       setMessage(`Repositori ${pendingDelete.name} dihapus.`);
       setPendingDelete(null);
       loadRepos();
+      loadCatalog();
     } catch (err: any) {
       setError(err.message);
     }
@@ -384,15 +493,15 @@ export const RepositoriesPage: React.FC = () => {
     <BlurFade duration={0.2}>
       <div className="flex flex-col gap-6">
         <PageHeader
-          title="Repositori Akademik (OAI-PMH)"
-          description="Kelola, uji koneksi 8 tahap, dan panen metadata serta full-text publik dari repositori DSpace 7, DSpace lama, OJS, dan EPrints."
+          title="Repositori Akademik Indonesia (OAI-PMH)"
+          description="Temukan repositori universitas dari katalog, uji konektivitas OAI-PMH, dan indeks karya ilmiah full-text terbuka ke korpus pembanding lokal."
           actions={
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={loadRepos}>
+              <Button variant="outline" size="sm" onClick={() => { loadRepos(); loadCatalog(); }}>
                 <RefreshCw className="size-4" data-icon="inline-start" aria-hidden="true" />
                 <span>Muat Ulang</span>
               </Button>
-              <Button size="sm" onClick={() => openAddWithPreset()}>
+              <Button size="sm" onClick={() => { resetAddModal(); setAddOpen(true); }}>
                 <Plus className="size-4" data-icon="inline-start" aria-hidden="true" />
                 <span>Tambah Repositori</span>
               </Button>
@@ -419,7 +528,7 @@ export const RepositoriesPage: React.FC = () => {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card className="shadow-none">
             <CardHeader className="pb-2">
-              <CardDescription>Repositori Terdaftar</CardDescription>
+              <CardDescription>Daftar Pribadi</CardDescription>
               <CardTitle className="text-2xl tabular-nums">{repos ? repos.length : "-"}</CardTitle>
             </CardHeader>
             <CardContent className="text-xs text-muted-foreground">
@@ -432,7 +541,7 @@ export const RepositoriesPage: React.FC = () => {
               <CardTitle className="text-2xl tabular-nums">{totalRecords}</CardTitle>
             </CardHeader>
             <CardContent className="text-xs text-muted-foreground">
-              Rekaman metadata OAI-PMH tersimpan lokal
+              Metadata tersimpan tidak pernah dianggap sebagai full-text
             </CardContent>
           </Card>
           <Card className="shadow-none">
@@ -441,220 +550,458 @@ export const RepositoriesPage: React.FC = () => {
               <CardTitle className="text-2xl tabular-nums">{totalFulltext}</CardTitle>
             </CardHeader>
             <CardContent className="text-xs text-muted-foreground">
-              Hanya dokumen penuh publik yang diindeks sebagai pembanding
+              Otomatis tersedia sebagai pembanding plagiasi lokal
             </CardContent>
           </Card>
         </div>
 
-        <Card className="shadow-none">
-          <CardHeader className="border-b border-border pb-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-base">Daftar Repositori Terhubung</CardTitle>
-                <CardDescription>
-                  Klik nama repositori untuk membuka detail, funnel 7 tahap, pilihan koleksi, pratinjau metadata, dan log panen.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {!repos ? (
-              <div className="p-6">
-                <Skeleton className="h-32 w-full" />
-              </div>
-            ) : repos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-6">
-                <BookMarked className="size-9 text-muted-foreground" aria-hidden="true" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">Belum ada repositori OAI-PMH terdaftar</p>
-                  <p className="mt-1 text-xs text-muted-foreground max-w-md">
-                    Tambahkan endpoint DSpace 7, DSpace lama, OJS, atau EPrints milik kampus/jurnal Anda lalu jalankan Wizard Uji Koneksi 8 tahap sebelum menyimpan.
-                  </p>
-                </div>
-                <Button size="sm" onClick={() => openAddWithPreset()}>
-                  <Plus className="size-4" data-icon="inline-start" aria-hidden="true" />
-                  <span>Tambah Repositori Pertama</span>
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nama</TableHead>
-                      <TableHead>Platform</TableHead>
-                      <TableHead>Koneksi</TableHead>
-                      <TableHead className="text-right">Record</TableHead>
-                      <TableHead className="text-right">Full-text</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {repos.map((r) => {
-                      const isBusy = busyId === r.id;
-                      const canResume = r.harvest_state === "PAUSED" || Boolean(r.has_resumption_token);
-                      return (
-                        <TableRow key={r.id}>
-                          <TableCell className="max-w-[280px]">
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/repositories/${r.id}`)}
-                              className="text-left font-medium text-foreground hover:text-primary hover:underline block truncate max-w-full"
-                            >
-                              {r.name}
-                            </button>
-                            <div className="text-xs text-muted-foreground truncate" title={r.base_url}>
-                              {r.base_url}
-                            </div>
-                            {r.last_error && (
-                              <div className="mt-0.5 text-[11px] text-destructive truncate" title={r.last_error}>
-                                {r.last_error}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{r.platform_label || r.repo_type}</Badge>
-                            <div className="mt-0.5 text-[11px] text-muted-foreground font-mono">
-                              {r.metadata_prefix}
-                              {r.selected_set ? ` · ${r.selected_set}` : ""}
-                            </div>
-                          </TableCell>
-                          <TableCell>{connectionBadge(r)}</TableCell>
-                          <TableCell className="text-right tabular-nums font-medium">
-                            {r.records_harvested}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums font-medium">
-                            {r.fulltext_indexed}
-                            {(r.failed_records_count ?? 0) > 0 && (
-                              <div className="text-[11px] text-amber-700 dark:text-amber-400">
-                                {r.failed_records_count} gagal PDF
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground">{harvestStatusLabel(r)}</span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => navigate(`/repositories/${r.id}`)}
-                                title="Buka Detail Repositori"
-                              >
-                                <ExternalLink className="size-3.5" aria-hidden="true" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={isBusy}
-                                onClick={() => handleVerify(r)}
-                                title="Uji Koneksi 8 Tahap"
-                              >
-                                {isBusy ? (
-                                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                                ) : (
-                                  <FlaskConical className="size-3.5" aria-hidden="true" />
-                                )}
-                                <span className="ml-1 hidden xl:inline">Uji</span>
-                              </Button>
-                              {canResume ? (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  disabled={isBusy}
-                                  onClick={() => handleHarvest(r, true)}
-                                  title="Lanjutkan Panen dari Token Terakhir"
-                                >
-                                  <Play className="size-3.5" aria-hidden="true" />
-                                  <span className="ml-1 hidden xl:inline">Lanjut</span>
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isBusy}
-                                  onClick={() => handleHarvest(r, false)}
-                                  title="Mulai Panen Metadata & Full-Text Publik"
-                                >
-                                  <DownloadCloud className="size-3.5" aria-hidden="true" />
-                                  <span className="ml-1 hidden xl:inline">Panen</span>
-                                </Button>
-                              )}
-                              {r.harvest_state === "RUNNING" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isBusy}
-                                  onClick={() => handlePause(r)}
-                                  title="Jeda Panen"
-                                >
-                                  <Pause className="size-3.5" aria-hidden="true" />
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openEditDialog(r)}
-                                title="Edit Pengaturan"
-                              >
-                                <Pencil className="size-3.5" aria-hidden="true" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setPendingDelete(r)}
-                                title="Hapus Repositori"
-                              >
-                                <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid">
+            <TabsTrigger value="personal" className="gap-2">
+              <BookMarked className="size-4" aria-hidden="true" />
+              <span>Daftar Pribadi ({repos ? repos.length : 0})</span>
+            </TabsTrigger>
+            <TabsTrigger value="catalog" className="gap-2">
+              <Library className="size-4" aria-hidden="true" />
+              <span>Katalog Repositori ({catalogItems ? catalogItems.length : 0})</span>
+            </TabsTrigger>
+          </TabsList>
 
-        {refEndpoints.length > 0 && (
-          <Card className="shadow-none">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Endpoint Publik Resmi untuk Uji Coba OAI-PMH</CardTitle>
-              <CardDescription>
-                Endpoint terbuka resmi di bawah ini dapat digunakan untuk menguji koneksi dan panen open-access. Untuk repositori kampus Anda sendiri, gunakan tombol Tambah Repositori dan masukkan URL resmi institusi.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {refEndpoints.map((ep) => (
-                <div
-                  key={ep.base_url}
-                  className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3.5"
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">{ep.name}</div>
-                    <div className="text-xs font-mono text-muted-foreground truncate">{ep.base_url}</div>
-                    <p className="mt-1 text-xs text-muted-foreground">{ep.note}</p>
+          {/* TAB 1: Personal Repositories */}
+          <TabsContent value="personal" className="mt-4">
+            <Card className="shadow-none">
+              <CardHeader className="border-b border-border pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base">Daftar Repositori Terhubung</CardTitle>
+                    <CardDescription>
+                      Klik nama repositori untuk membuka Penjelajah Koleksi, filter tahun/kata kunci/jenis dokumen, dokumen terindeks, dan riwayat panen.
+                    </CardDescription>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => openAddWithPreset(ep)}
-                  >
-                    Uji di Formulir
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {!repos ? (
+                  <div className="p-6">
+                    <Skeleton className="h-32 w-full" />
+                  </div>
+                ) : repos.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-6">
+                    <BookMarked className="size-9 text-muted-foreground" aria-hidden="true" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Belum ada repositori OAI-PMH di daftar pribadi</p>
+                      <p className="mt-1 text-xs text-muted-foreground max-w-md">
+                        Tambahkan endpoint secara manual atau pilih dan uji repositori universitas Indonesia dari tab Katalog Repositori.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setActiveTab("catalog")}>
+                        <Library className="size-4" data-icon="inline-start" aria-hidden="true" />
+                        <span>Jelajahi Katalog</span>
+                      </Button>
+                      <Button size="sm" onClick={() => { resetAddModal(); setAddOpen(true); }}>
+                        <Plus className="size-4" data-icon="inline-start" aria-hidden="true" />
+                        <span>Tambah Manual</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nama</TableHead>
+                          <TableHead>Platform</TableHead>
+                          <TableHead>Koneksi</TableHead>
+                          <TableHead className="text-right">Record</TableHead>
+                          <TableHead className="text-right">Full-text</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {repos.map((r) => {
+                          const isBusy = busyId === r.id;
+                          const canResume = r.harvest_state === "PAUSED" || Boolean(r.has_resumption_token);
+                          return (
+                            <TableRow key={r.id}>
+                              <TableCell className="max-w-[280px]">
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/repositories/${r.id}`)}
+                                  className="text-left font-medium text-foreground hover:text-primary hover:underline block truncate max-w-full"
+                                >
+                                  {r.name}
+                                </button>
+                                <div className="text-xs text-muted-foreground truncate" title={r.base_url}>
+                                  {r.base_url}
+                                </div>
+                                {r.last_error && (
+                                  <div className="mt-0.5 text-[11px] text-destructive truncate" title={r.last_error}>
+                                    {r.last_error}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{r.platform_label || r.repo_type}</Badge>
+                                <div className="mt-0.5 text-[11px] text-muted-foreground font-mono">
+                                  {r.metadata_prefix}
+                                  {r.selected_set ? ` · ${r.selected_set}` : ""}
+                                </div>
+                              </TableCell>
+                              <TableCell>{connectionBadge(r.status)}</TableCell>
+                              <TableCell className="text-right tabular-nums font-medium">
+                                {r.records_harvested}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums font-medium">
+                                {r.fulltext_indexed}
+                                {(r.failed_records_count ?? 0) > 0 && (
+                                  <div className="text-[11px] text-amber-700 dark:text-amber-400">
+                                    {r.failed_records_count} gagal PDF
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-xs text-muted-foreground">{harvestStatusLabel(r)}</div>
+                                {r.schedule_enabled && (
+                                  <div className="text-[11px] text-primary">
+                                    Terjadwal / {r.schedule_interval_hours || 24} jam
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => navigate(`/repositories/${r.id}`)}
+                                    title="Buka Detail Repositori"
+                                  >
+                                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isBusy}
+                                    onClick={() => handleVerify(r)}
+                                    title="Uji Koneksi 8 Tahap"
+                                  >
+                                    {isBusy ? (
+                                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                                    ) : (
+                                      <FlaskConical className="size-3.5" aria-hidden="true" />
+                                    )}
+                                    <span className="ml-1 hidden xl:inline">Uji</span>
+                                  </Button>
+                                  {canResume ? (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      disabled={isBusy}
+                                      onClick={() => handleHarvest(r, true)}
+                                      title="Lanjutkan Panen dari Token Terakhir"
+                                    >
+                                      <Play className="size-3.5" aria-hidden="true" />
+                                      <span className="ml-1 hidden xl:inline">Lanjut</span>
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isBusy}
+                                      onClick={() => handleHarvest(r, false)}
+                                      title="Mulai Panen Metadata & Full-Text Publik"
+                                    >
+                                      <DownloadCloud className="size-3.5" aria-hidden="true" />
+                                      <span className="ml-1 hidden xl:inline">Panen</span>
+                                    </Button>
+                                  )}
+                                  {r.harvest_state === "RUNNING" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isBusy}
+                                      onClick={() => handlePause(r)}
+                                      title="Jeda Panen"
+                                    >
+                                      <Pause className="size-3.5" aria-hidden="true" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openEditDialog(r)}
+                                    title="Edit Pengaturan"
+                                  >
+                                    <Pencil className="size-3.5" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setPendingDelete(r)}
+                                    title="Hapus Repositori"
+                                  >
+                                    <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 2: Repository Discovery Catalog */}
+          <TabsContent value="catalog" className="mt-4 flex flex-col gap-4">
+            <Card className="shadow-none">
+              <CardHeader className="pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base">Katalog Penemuan Repositori Akademik</CardTitle>
+                    <CardDescription>
+                      Cari nama universitas atau jurnal, pilih platform, uji konektivitas OAI-PMH secara langsung, lalu tambahkan ke daftar pribadi Anda. Repositori berstatus Belum Diuji sebelum diverifikasi.
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setAddCatalogOpen(true)}>
+                    <Globe className="size-4" data-icon="inline-start" aria-hidden="true" />
+                    <span>Daftarkan URL ke Katalog</span>
                   </Button>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <div className="md:col-span-2 relative">
+                    <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" aria-hidden="true" />
+                    <Input
+                      className="pl-9"
+                      placeholder="Cari nama universitas, repositori, atau domain..."
+                      value={catalogQuery}
+                      onChange={(e) => setCatalogQuery(e.target.value)}
+                    />
+                  </div>
+                  <Select value={catalogPlatform} onValueChange={setCatalogPlatform}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua Platform" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Platform</SelectItem>
+                      <SelectItem value="ojs">OJS</SelectItem>
+                      <SelectItem value="dspace7">DSpace 7</SelectItem>
+                      <SelectItem value="dspace_legacy">DSpace Lama</SelectItem>
+                      <SelectItem value="eprints">EPrints</SelectItem>
+                      <SelectItem value="arxiv">arXiv OAI-PMH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={catalogStatus} onValueChange={setCatalogStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua Status OAI" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Status OAI</SelectItem>
+                      <SelectItem value="UNVERIFIED">Belum Diuji</SelectItem>
+                      <SelectItem value="VERIFIED">Terhubung</SelectItem>
+                      <SelectItem value="PARTIAL">Terhubung (Catatan)</SelectItem>
+                      <SelectItem value="ERROR">Kendala Koneksi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        {/* Add Repository + 8-Stage Connection Test Wizard Modal */}
+                {!catalogItems ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : catalogItems.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    Tidak ada entri katalog yang cocok dengan pencarian Anda.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Universitas & Repositori</TableHead>
+                          <TableHead>Platform</TableHead>
+                          <TableHead>Status OAI-PMH</TableHead>
+                          <TableHead className="text-right">Koleksi</TableHead>
+                          <TableHead>Format Metadata</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {catalogItems.map((item) => {
+                          const isTesting = testingCatalogId === item.id;
+                          const isAdding = addingCatalogId === item.id;
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="max-w-[300px]">
+                                <div className="font-medium text-foreground">{item.university}</div>
+                                <div className="text-xs text-foreground/85">{item.name}</div>
+                                <div className="text-[11px] font-mono text-muted-foreground truncate" title={item.base_url}>
+                                  {item.base_url}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{item.platform_label}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {connectionBadge(item.oai_status)}
+                                {item.last_error && (
+                                  <div className="mt-1 max-w-[200px] text-[11px] text-muted-foreground line-clamp-2" title={item.last_error}>
+                                    {item.last_error}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums font-medium">
+                                {item.last_tested_at ? item.collections_count : "-"}
+                              </TableCell>
+                              <TableCell className="max-w-[200px]">
+                                {item.supported_formats.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.supported_formats.slice(0, 4).map((fmt) => (
+                                      <Badge key={fmt} variant="secondary" className="font-mono text-[10px]">
+                                        {fmt}
+                                      </Badge>
+                                    ))}
+                                    {item.supported_formats.length > 4 && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        +{item.supported_formats.length - 4}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Belum diuji</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isTesting}
+                                    onClick={() => handleTestCatalog(item)}
+                                  >
+                                    {isTesting ? (
+                                      <Loader2 className="size-3.5 animate-spin mr-1" aria-hidden="true" />
+                                    ) : (
+                                      <FlaskConical className="size-3.5 mr-1" aria-hidden="true" />
+                                    )}
+                                    <span>Uji</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={item.already_in_personal ? "secondary" : "default"}
+                                    disabled={isAdding || item.already_in_personal}
+                                    onClick={() => handleAddFromCatalog(item)}
+                                  >
+                                    {isAdding ? (
+                                      <Loader2 className="size-3.5 animate-spin mr-1" aria-hidden="true" />
+                                    ) : (
+                                      <Plus className="size-3.5 mr-1" aria-hidden="true" />
+                                    )}
+                                    <span>{item.already_in_personal ? "Di Daftar" : "Tambahkan"}</span>
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Catalog Connectivity Result Dialog */}
+        <Dialog open={Boolean(catalogWizardResult)} onOpenChange={(open) => !open && setCatalogWizardResult(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Hasil Uji Konektivitas — {catalogWizardResult?.entry.university}
+              </DialogTitle>
+              <DialogDescription>
+                {catalogWizardResult?.entry.base_url}
+              </DialogDescription>
+            </DialogHeader>
+            {catalogWizardResult && <OAIWizardView report={catalogWizardResult.wizard} showSamples />}
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCatalogWizardResult(null)}>
+                Tutup
+              </Button>
+              {catalogWizardResult && !catalogWizardResult.entry.already_in_personal && (
+                <Button
+                  onClick={async () => {
+                    const entry = catalogWizardResult.entry;
+                    setCatalogWizardResult(null);
+                    await handleAddFromCatalog(entry);
+                  }}
+                >
+                  <Plus className="size-4 mr-1.5" aria-hidden="true" />
+                  Tambahkan ke Daftar Pribadi
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Manual Register to Catalog Dialog */}
+        <Dialog open={addCatalogOpen} onOpenChange={setAddCatalogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Daftarkan Endpoint ke Katalog</DialogTitle>
+              <DialogDescription>
+                Masukkan nama universitas, nama repositori, dan URL OAI-PMH resmi. Entri baru selalu dimulai dengan status Belum Diuji hingga Anda menguji konektivitasnya.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveCatalogEntry} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="cat-univ">Nama Universitas / Institusi</Label>
+                <Input id="cat-univ" value={catUniv} onChange={(e) => setCatUniv(e.target.value)} placeholder="Contoh: Universitas ..." required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="cat-name">Nama Repositori / Jurnal</Label>
+                <Input id="cat-name" value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="Contoh: Institutional Repository" required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="cat-url">Base URL OAI-PMH</Label>
+                <Input id="cat-url" value={catUrl} onChange={(e) => setCatUrl(e.target.value)} placeholder="https://..." required />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Platform</Label>
+                <Select value={catPlatform} onValueChange={setCatPlatform}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLATFORM_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="cat-desc">Catatan Singkat (Opsional)</Label>
+                <Input id="cat-desc" value={catDesc} onChange={(e) => setCatDesc(e.target.value)} placeholder="Deskripsi koleksi skripsi, tesis, atau jurnal" />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setAddCatalogOpen(false)}>Batal</Button>
+                <Button type="submit" disabled={savingCat}>
+                  {savingCat && <Loader2 className="size-4 animate-spin mr-1.5" aria-hidden="true" />}
+                  Simpan ke Katalog
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Personal Repository + 8-Stage Connection Test Wizard Modal */}
         <Dialog
           open={addOpen}
           onOpenChange={(open) => {

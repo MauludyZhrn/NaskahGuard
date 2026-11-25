@@ -107,6 +107,7 @@ def ingest_validated_upload(
     access_status: str = "INDEXED_LOCALLY",
     provider: str | None = None,
     external_id: str | None = None,
+    extra_metadata: dict[str, Any] | None = None,
 ) -> Document:
     """Persist upload to local storage, extract text/tokens/segments, and store DB records."""
     existing = (
@@ -195,7 +196,7 @@ def ingest_validated_upload(
         provider=provider,
         external_id=external_id,
         retrieved_at=datetime.now(timezone.utc) if provider else None,
-        extra=extracted.extra,
+        extra={**dict(extracted.extra or {}), **dict(extra_metadata or {})},
     )
     db.add(doc)
     db.flush()

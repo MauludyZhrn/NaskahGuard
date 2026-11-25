@@ -277,6 +277,14 @@ class OAIRepository(Base):
     failed_records_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rate_limit_delay_sec: Mapped[float] = mapped_column(Float, nullable=False, default=0.8)
     request_timeout_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    year_from: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    year_to: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    keyword_filter: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    doc_type_filter: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    max_downloads: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    schedule_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    schedule_interval_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+    next_scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="UNVERIFIED")
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
@@ -287,6 +295,9 @@ class OAIRepository(Base):
     )
     harvest_logs: Mapped[list[OAIHarvestLog]] = relationship(
         "OAIHarvestLog", back_populates="repository", cascade="all, delete-orphan"
+    )
+    harvest_runs: Mapped[list[OAIHarvestRun]] = relationship(
+        "OAIHarvestRun", back_populates="repository", cascade="all, delete-orphan"
     )
 
 
@@ -306,6 +317,8 @@ class OAIHarvestRecord(Base):
     authors: Mapped[list | None] = mapped_column(JSON, nullable=True)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     doi: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    doc_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    subjects: Mapped[list | None] = mapped_column(JSON, nullable=True)
     rights: Mapped[str | None] = mapped_column(String(255), nullable=True)
     landing_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)
     pdf_urls: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -342,3 +355,50 @@ class OAIHarvestLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
 
     repository: Mapped[OAIRepository] = relationship("OAIRepository", back_populates="harvest_logs")
+
+
+class OAIHarvestRun(Base):
+    __tablename__ = "oai_harvest_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    repository_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("oai_repositories.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    trigger_mode: Mapped[str] = mapped_column(String(24), nullable=False, default="MANUAL")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="RUNNING")
+    set_spec: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_prefix: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    filters_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    records_scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    records_matched_filter: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    records_harvested: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    fulltext_indexed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    metadata_only: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_records: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicates_skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    repository: Mapped[OAIRepository] = relationship("OAIRepository", back_populates="harvest_runs")
+
+
+class RepositoryCatalogEntry(Base):
+    __tablename__ = "oai_catalog"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    university: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    base_url: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
+    platform: Mapped[str] = mapped_column(String(32), nullable=False, default="other", index=True)
+    platform_label: Mapped[str] = mapped_column(String(64), nullable=False, default="OAI-PMH Umum")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    oai_status: Mapped[str] = mapped_column(String(32), nullable=False, default="UNVERIFIED", index=True)
+    identified_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    collections_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    supported_formats: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    available_sets: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_custom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)

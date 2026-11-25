@@ -247,9 +247,19 @@ def main() -> int:
                     })
                     page.screenshot(path=str(SCREENSHOT_DIR / fname), full_page=False)
 
-                # Capture Add Repository + 8-Stage Connection Wizard Modal
+                # Capture Add Repository Modal & Catalog Tab on /repositories
                 page.goto(f"{base_url}/repositories", wait_until="networkidle")
                 page.wait_for_timeout(350)
+                catalog_tab = page.get_by_role("tab", name="Katalog Repositori")
+                if catalog_tab.count() > 0:
+                    catalog_tab.first.click()
+                    page.wait_for_timeout(450)
+                page.screenshot(path=str(SCREENSHOT_DIR / "24_repositories_catalog.png"), full_page=False)
+
+                personal_tab = page.get_by_role("tab", name="Daftar Pribadi")
+                if personal_tab.count() > 0:
+                    personal_tab.first.click()
+                    page.wait_for_timeout(250)
                 add_repo_btn = page.get_by_role("button", name="Tambah Repositori")
                 if add_repo_btn.count() > 0:
                     add_repo_btn.first.click()

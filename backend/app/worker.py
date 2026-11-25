@@ -13,7 +13,7 @@ from app.db import get_session_factory
 from app.engine.minhash_lsh import invalidate_lsh_cache
 from app.engine.pipeline import run_check_pipeline
 from app.ingestion.validators import resolve_safe_storage_path
-from app.models import Check, Document
+from app.models import Check, Document, OAIRepository
 
 logger = logging.getLogger("naskahguard.worker")
 
@@ -21,6 +21,7 @@ _executor: ThreadPoolExecutor | None = None
 _executor_lock = threading.Lock()
 _stop_event = threading.Event()
 _retention_thread: threading.Thread | None = None
+_oai_scheduler_thread: threading.Thread | None = None
 
 
 def _run_job(check_id: str) -> None:
@@ -95,8 +96,57 @@ def _retention_loop() -> None:
             logger.exception("Error during periodic retention purge")
 
 
+def run_due_scheduled_harvests() -> int:
+    """Run polite bounded harvesting for repositories whose optional schedule is enabled and due."""
+    from app.sources.oai_pmh import harvest_oai_repository
+
+    now = datetime.now(timezone.utc)
+    factory = get_session_factory()
+    db = factory()
+    ran = 0
+    try:
+        due_repos = (
+            db.query(OAIRepository)
+            .filter(
+                OAIRepository.enabled.is_(True),
+                OAIRepository.schedule_enabled.is_(True),
+                OAIRepository.harvest_state != "RUNNING",
+                (OAIRepository.next_scheduled_at.is_(None)) | (OAIRepository.next_scheduled_at <= now),
+            )
+            .order_by(OAIRepository.next_scheduled_at.asc())
+            .limit(3)
+            .all()
+        )
+        for repo in due_repos:
+            try:
+                harvest_oai_repository(
+                    db,
+                    repo,
+                    max_records=15,
+                    max_downloads=min(10, int(repo.max_downloads or 10)),
+                    download_pdfs=True,
+                    resume=bool(repo.resumption_token),
+                    incremental=True,
+                    trigger_mode="SCHEDULED",
+                )
+                ran += 1
+            except Exception as exc:
+                logger.warning("Scheduled OAI harvest failed for %s: %s", repo.name, exc)
+    finally:
+        db.close()
+    return ran
+
+
+def _oai_scheduler_loop() -> None:
+    while not _stop_event.wait(600):
+        try:
+            run_due_scheduled_harvests()
+        except Exception:
+            logger.exception("Error during scheduled OAI-PMH harvest check")
+
+
 def start_worker() -> None:
-    global _executor, _retention_thread
+    global _executor, _retention_thread, _oai_scheduler_thread
     settings = get_settings()
     with _executor_lock:
         if _executor is None:
@@ -123,10 +173,13 @@ def start_worker() -> None:
     finally:
         db.close()
 
+    _stop_event.clear()
     if settings.RETENTION_DAYS > 0 and (_retention_thread is None or not _retention_thread.is_alive()):
-        _stop_event.clear()
         _retention_thread = threading.Thread(target=_retention_loop, daemon=True, name="ng-retention")
         _retention_thread.start()
+    if _oai_scheduler_thread is None or not _oai_scheduler_thread.is_alive():
+        _oai_scheduler_thread = threading.Thread(target=_oai_scheduler_loop, daemon=True, name="ng-oai-scheduler")
+        _oai_scheduler_thread.start()
 
 
 def stop_worker() -> None:

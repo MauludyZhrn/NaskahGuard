@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
 from urllib.parse import parse_qsl, urljoin, urlparse, urlunparse
@@ -24,19 +24,31 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.ingestion.service import ingest_validated_upload
 from app.ingestion.validators import validate_local_bytes
-from app.models import CheckSource, Document, OAIHarvestLog, OAIHarvestRecord, OAIRepository
+from app.models import (
+    CheckSource,
+    Document,
+    OAIHarvestLog,
+    OAIHarvestRecord,
+    OAIHarvestRun,
+    OAIRepository,
+)
 from app.sources.crawler import fetch_public_url
 from app.sources.dedup import find_duplicate_source
 from app.sources.ssrf import SSRFError, validate_public_url
 
 _DOI_RE = re.compile(r"\b(10\.\d{4,9}/[-._;()/:A-Z0-9]+)\b", re.IGNORECASE)
 _ARXIV_ABS_RE = re.compile(r"^https?://(?:export\.)?arxiv\.org/abs/([^\s?#]+)", re.IGNORECASE)
+_OJS_GALLEY_RE = re.compile(r"^(https?://[^?#]+/article/)view/(\d+)/(\d+)/?$", re.IGNORECASE)
 _CITATION_PDF_RE = re.compile(
     r"""<meta[^>]+name=["']citation_pdf_url["'][^>]+content=["']([^"']+)["']""",
     re.IGNORECASE,
 )
 _CITATION_PDF_RE_ALT = re.compile(
     r"""<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_pdf_url["']""",
+    re.IGNORECASE,
+)
+_HREF_PDF_CANDIDATE_RE = re.compile(
+    r"""href=["']([^"']+(?:/bitstream/[^"']+|/bitstreams/[^"']+/content|/article/download/[^"']+|/download/[^"']+|\.pdf(?:\?[^"']*)?))["']""",
     re.IGNORECASE,
 )
 
@@ -362,6 +374,8 @@ class OAIRecord:
     authors: list[str] = field(default_factory=list)
     year: int | None = None
     doi: str | None = None
+    doc_type: str | None = None
+    subjects: list[str] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
     pdf_urls: list[str] = field(default_factory=list)
     rights: str | None = None
@@ -631,6 +645,8 @@ class OAIPMHClient:
         raw_links: list[str] = []
         rights: list[str] = []
         descriptions: list[str] = []
+        doc_types: list[str] = []
+        subjects: list[str] = []
 
         # Parse header cleanly first
         header_el = None
@@ -698,6 +714,10 @@ class OAIPMHClient:
                             rights.append(text_val)
                         elif dim_elem == "description":
                             descriptions.append(" ".join(text_val.split()))
+                        elif dim_elem == "type":
+                            doc_types.append(" ".join(text_val.split()))
+                        elif dim_elem == "subject":
+                            subjects.append(" ".join(text_val.split()))
                     continue
 
                 if not text_val:
@@ -715,6 +735,10 @@ class OAIPMHClient:
                     rights.append(text_val)
                 elif ln in {"description", "abstract"}:
                     descriptions.append(" ".join(text_val.split()))
+                elif ln in {"type", "genre"}:
+                    doc_types.append(" ".join(text_val.split()))
+                elif ln in {"subject", "topic"}:
+                    subjects.append(" ".join(text_val.split()))
 
         year = None
         for d in dates:
@@ -755,6 +779,8 @@ class OAIPMHClient:
             authors=authors[:10],
             year=year,
             doi=doi,
+            doc_type=doc_types[0][:120] if doc_types else None,
+            subjects=subjects[:10],
             urls=urls,
             pdf_urls=pdf_urls,
             rights=rights[0][:250] if rights else None,
@@ -1538,24 +1564,98 @@ def _log_oai(
 
 
 def _discover_pdf_from_landing_page(
-    landing_url: str,
+    landing_urls: list[str],
     *,
     oai: OAIPMHClient,
-) -> str | None:
-    """Inspect a public OJS/DSpace/EPrints landing page for <meta name='citation_pdf_url'>."""
-    try:
-        resp, final_url, _ = oai._safe_http_get(landing_url)
-        if resp.status_code != 200:
-            return None
-        html = resp.text[:65536]
-        m = _CITATION_PDF_RE.search(html) or _CITATION_PDF_RE_ALT.search(html)
-        if m:
-            candidate = urljoin(final_url, m.group(1).strip())
-            validate_public_url(candidate, resolve_dns=oai.resolve_dns)
-            return candidate
-    except Exception:
-        return None
-    return None
+) -> list[str]:
+    """Inspect public OJS/DSpace/EPrints landing or galley URLs for open-access PDF links."""
+    found: list[str] = []
+    # Check OJS galley pattern (/article/view/{article_id}/{galley_id}) -> candidate /article/download/...
+    for lu in landing_urls:
+        m_ojs = _OJS_GALLEY_RE.match(lu.strip())
+        if m_ojs:
+            dl_cand = f"{m_ojs.group(1)}download/{m_ojs.group(2)}/{m_ojs.group(3)}"
+            try:
+                validate_public_url(dl_cand, resolve_dns=oai.resolve_dns)
+                if dl_cand not in found:
+                    found.append(dl_cand)
+            except Exception:
+                pass
+
+    for lu in landing_urls[:2]:
+        try:
+            resp, final_url, _ = oai._safe_http_get(lu)
+            if resp.status_code != 200:
+                continue
+            ct = (resp.headers.get("content-type") or "").lower()
+            if "application/pdf" in ct or resp.content[:5] == b"%PDF-":
+                if final_url not in found:
+                    found.append(final_url)
+                continue
+            html = resp.text[:98304]
+            m = _CITATION_PDF_RE.search(html) or _CITATION_PDF_RE_ALT.search(html)
+            if m:
+                candidate = urljoin(final_url, m.group(1).strip())
+                validate_public_url(candidate, resolve_dns=oai.resolve_dns)
+                if candidate not in found:
+                    found.append(candidate)
+            for hm in _HREF_PDF_CANDIDATE_RE.finditer(html):
+                href_raw = hm.group(1).strip().replace("&amp;", "&")
+                candidate = urljoin(final_url, href_raw)
+                try:
+                    validate_public_url(candidate, resolve_dns=oai.resolve_dns)
+                except Exception:
+                    continue
+                if candidate not in found:
+                    found.append(candidate)
+                if len(found) >= 3:
+                    break
+        except Exception:
+            continue
+    return found
+
+
+def _record_matches_filters(
+    rec: OAIRecord,
+    *,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    keyword_filter: str | None = None,
+    doc_type_filter: str | None = None,
+) -> bool:
+    """Apply Phase 10.4 record-level filtering (year range, keyword, document type)."""
+    if year_from is not None:
+        if rec.year is None or rec.year < year_from:
+            return False
+    if year_to is not None:
+        if rec.year is None or rec.year > year_to:
+            return False
+
+    if keyword_filter and keyword_filter.strip():
+        terms = [t.strip().lower() for t in re.split(r"[,;\s]+", keyword_filter.strip()) if t.strip()]
+        hay = " ".join([rec.title or "", rec.description or "", " ".join(rec.subjects or [])]).lower()
+        if not any(term in hay for term in terms):
+            return False
+
+    if doc_type_filter and doc_type_filter.strip():
+        dt_needle = doc_type_filter.strip().lower()
+        dt_hay = " ".join(
+            [rec.doc_type or "", " ".join(rec.set_specs or []), rec.title or ""]
+        ).lower()
+        # Handle Indonesian/English common synonyms cleanly
+        synonym_groups = {
+            "skripsi": ("skripsi", "undergraduate thesis", "bachelor", "tugas akhir"),
+            "tesis": ("tesis", "master thesis", "magister"),
+            "disertasi": ("disertasi", "doctoral", "dissertation"),
+            "artikel": ("artikel", "article", "journal", "jurnal", "info:eu-repo/semantics/article"),
+            "prosiding": ("prosiding", "conference", "proceeding"),
+            "buku": ("buku", "book", "monograph"),
+        }
+        accepted = synonym_groups.get(dt_needle, (dt_needle,))
+        if not any(tok in dt_hay for tok in accepted):
+            return False
+
+    return True
 
 
 def _sync_repo_counters(db: Session, repo: OAIRepository) -> None:
@@ -1635,6 +1735,7 @@ def _acquire_and_index_record(
     client: httpx.Client | None,
     resolve_dns: bool,
     download_pdfs: bool,
+    allow_download: bool = True,
 ) -> tuple[bool, bool, str | None]:
     """Attempt PDF acquisition & local indexing for one OAIHarvestRecord.
 
@@ -1661,19 +1762,24 @@ def _acquire_and_index_record(
         hrec.updated_at = datetime.now(timezone.utc)
         return False, False, None
 
-    if not download_pdfs:
+    if not download_pdfs or not allow_download:
         hrec.status = "PDF_FOUND" if pdf_urls else "METADATA_SAVED"
         hrec.error_code = None
-        hrec.error_message = None
+        hrec.error_message = (
+            "Batas maksimum unduhan PDF per sesi tercapai; metadata tetap disimpan."
+            if (download_pdfs and not allow_download and pdf_urls)
+            else None
+        )
         hrec.updated_at = datetime.now(timezone.utc)
         return False, False, None
 
-    # If no direct PDF URL in XML, check first public landing page for citation_pdf_url
+    # If no direct PDF URL in XML, check public landing / galley URLs
     if not pdf_urls and landing_urls:
-        discovered = _discover_pdf_from_landing_page(landing_urls[0], oai=oai)
+        discovered = _discover_pdf_from_landing_page(landing_urls, oai=oai)
         if discovered:
-            pdf_urls.append(discovered)
+            pdf_urls.extend(discovered)
             hrec.pdf_urls = pdf_urls
+            primary_url = primary_url or pdf_urls[0]
 
     if not pdf_urls:
         hrec.status = "METADATA_SAVED"
@@ -1685,7 +1791,7 @@ def _acquire_and_index_record(
     last_err_code: str | None = None
     last_err_msg: str | None = None
 
-    for pdf_url in pdf_urls[:2]:
+    for pdf_url in pdf_urls[:3]:
         crawl = fetch_public_url(
             pdf_url,
             client=client,
@@ -1694,10 +1800,10 @@ def _acquire_and_index_record(
             resolve_dns=resolve_dns,
         )
         if crawl.status == "FULLTEXT_FETCHED" and crawl.raw_bytes and crawl.file_type:
-            # Guard against HTML login/paywall page masquerading as PDF
-            if crawl.file_type == "html" and pdf_url.lower().endswith(".pdf"):
+            # Guard against HTML login/paywall/viewer pages masquerading as PDF
+            if crawl.file_type == "html":
                 last_err_code = "PDF_INACCESSIBLE"
-                last_err_msg = "Tautan PDF mengembalikan halaman HTML, bukan berkas PDF."
+                last_err_msg = "Tautan mengembalikan halaman HTML, bukan berkas PDF full-text."
                 continue
             try:
                 val = validate_local_bytes(
@@ -1722,6 +1828,17 @@ def _acquire_and_index_record(
                     hrec.updated_at = datetime.now(timezone.utc)
                     return True, False, None
 
+                provenance_extra = {
+                    "repository_id": repo.id,
+                    "repository_name": repo.name,
+                    "university": repo.identified_name or repo.name,
+                    "oai_base_url": repo.base_url,
+                    "oai_identifier": hrec.oai_identifier,
+                    "oai_set_spec": hrec.set_spec,
+                    "doc_type": hrec.doc_type,
+                    "platform": repo.platform_detected or repo.repo_type,
+                    "retrieved_at": datetime.now(timezone.utc).isoformat(),
+                }
                 doc = ingest_validated_upload(
                     db,
                     val,
@@ -1738,6 +1855,7 @@ def _acquire_and_index_record(
                     access_status="INDEXED_LOCALLY",
                     provider=f"oai:{repo.name}",
                     external_id=hrec.oai_identifier,
+                    extra_metadata=provenance_extra,
                 )
                 hrec.status = "INDEXED"
                 hrec.document_id = doc.id
@@ -1768,15 +1886,22 @@ def harvest_oai_repository(
     repo: OAIRepository,
     *,
     max_records: int = 20,
+    max_downloads: int | None = None,
     download_pdfs: bool = True,
     resume: bool = False,
     reset_cursor: bool = False,
+    incremental: bool = True,
     set_spec: str | None = None,
     metadata_prefix: str | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+    keyword_filter: str | None = None,
+    doc_type_filter: str | None = None,
+    trigger_mode: str = "MANUAL",
     client: httpx.Client | None = None,
     resolve_dns: bool = True,
 ) -> dict[str, Any]:
-    """Fault-tolerant, resumable OAI-PMH 2.0 harvester with per-page commits and strict funnel tracking."""
+    """Fault-tolerant, resumable OAI-PMH 2.0 harvester with Phase 10.4 filters, download limits, and run history."""
     oai = OAIPMHClient(
         client=client,
         resolve_dns=resolve_dns,
@@ -1784,12 +1909,45 @@ def harvest_oai_repository(
         rate_limit_delay_sec=float(repo.rate_limit_delay_sec or 0.0) if client is None else 0.0,
     )
 
-    if reset_cursor:
+    if reset_cursor or not incremental:
         repo.resumption_token = None
-        repo.last_datestamp = None
+        if reset_cursor:
+            repo.last_datestamp = None
 
     effective_set = set_spec if set_spec is not None else repo.selected_set
     effective_prefix = (metadata_prefix or repo.metadata_prefix or "oai_dc").strip()
+    eff_year_from = year_from if year_from is not None else repo.year_from
+    eff_year_to = year_to if year_to is not None else repo.year_to
+    eff_keyword = keyword_filter if keyword_filter is not None else repo.keyword_filter
+    eff_doc_type = doc_type_filter if doc_type_filter is not None else repo.doc_type_filter
+    eff_max_downloads = (
+        max_downloads
+        if max_downloads is not None
+        else (repo.max_downloads if repo.max_downloads is not None else max_records)
+    )
+    eff_max_downloads = max(0, min(eff_max_downloads, max_records))
+
+    # Bound scanned records so broad filters cannot scan an unbounded repository indefinitely
+    max_scan_budget = max(max_records * 5, 100)
+
+    run_row = OAIHarvestRun(
+        repository_id=repo.id,
+        trigger_mode="RESUME" if (resume and trigger_mode == "MANUAL") else trigger_mode,
+        status="RUNNING",
+        set_spec=effective_set or None,
+        metadata_prefix=effective_prefix,
+        filters_snapshot={
+            "year_from": eff_year_from,
+            "year_to": eff_year_to,
+            "keyword_filter": eff_keyword,
+            "doc_type_filter": eff_doc_type,
+            "max_records": max_records,
+            "max_downloads": eff_max_downloads,
+            "incremental": incremental,
+        },
+        started_at=datetime.now(timezone.utc),
+    )
+    db.add(run_row)
 
     repo.status = "HARVESTING"
     repo.harvest_state = "RUNNING"
@@ -1799,15 +1957,20 @@ def harvest_oai_repository(
         db,
         repo.id,
         "HARVEST_START",
-        f"Memulai panen OAI-PMH (maks {max_records} rekaman, format {effective_prefix}"
+        f"Memulai panen {run_row.trigger_mode} (maks {max_records} rekaman, maks {eff_max_downloads} unduhan PDF, format {effective_prefix}"
         + (f", koleksi {effective_set}" if effective_set else "")
-        + (", lanjutkan token" if resume and repo.resumption_token else "")
+        + (f", tahun {eff_year_from or '*'}–{eff_year_to or '*'}" if (eff_year_from or eff_year_to) else "")
+        + (f", kata kunci '{eff_keyword}'" if eff_keyword else "")
+        + (f", jenis '{eff_doc_type}'" if eff_doc_type else "")
         + ").",
     )
     db.commit()
 
+    run_scanned = 0
+    run_matched = 0
     run_harvested = 0
     run_indexed = 0
+    run_downloads_attempted = 0
     run_metadata_only = 0
     run_duplicates = 0
     run_deleted = 0
@@ -1819,7 +1982,6 @@ def harvest_oai_repository(
     latest_ds = repo.last_datestamp
 
     try:
-        # Step A: Identify & negotiate format (only when starting fresh, or if not yet identified)
         ident = oai.identify(repo.base_url)
         if ident.get("repositoryName"):
             repo.identified_name = ident["repositoryName"][:500]
@@ -1841,8 +2003,8 @@ def harvest_oai_repository(
                     )
                     effective_prefix = negotiated
                     repo.metadata_prefix = negotiated
+                    run_row.metadata_prefix = negotiated
         except OAIPMHProtocolError:
-            # Keep configured prefix if ListMetadataFormats is unsupported
             pass
 
         db.commit()
@@ -1850,9 +2012,14 @@ def harvest_oai_repository(
         token: str | None = repo.resumption_token if resume else None
         first_page = not bool(token)
         token_retried = False
+        has_filters = bool(eff_year_from or eff_year_to or eff_keyword or eff_doc_type)
 
-        while run_harvested < max_records:
-            # Check for Pause signal between pages
+        # Compute OAI 'from' datestamp: incremental last_datestamp OR explicit year_from
+        from_ds = repo.last_datestamp if (incremental and first_page and not token) else None
+        if not from_ds and eff_year_from and not token:
+            from_ds = f"{eff_year_from:04d}-01-01"
+
+        while run_harvested < max_records and run_scanned < max_scan_budget:
             db.refresh(repo)
             if repo.harvest_state == "PAUSED":
                 paused = True
@@ -1868,7 +2035,7 @@ def harvest_oai_repository(
                 recs, next_token = oai.list_records(
                     repo.base_url,
                     metadata_prefix=effective_prefix,
-                    from_datestamp=repo.last_datestamp if (first_page and not token) else None,
+                    from_datestamp=from_ds if (first_page and not token) else None,
                     set_spec=effective_set if (first_page and not token) else None,
                     resumption_token=token,
                     include_deleted=True,
@@ -1914,6 +2081,7 @@ def harvest_oai_repository(
             for rec in recs:
                 if run_harvested >= max_records:
                     break
+                run_scanned += 1
 
                 if rec.datestamp and (latest_ds is None or rec.datestamp > latest_ds):
                     latest_ds = rec.datestamp
@@ -1949,6 +2117,16 @@ def harvest_oai_repository(
                         existing_rec.updated_at = datetime.now(timezone.utc)
                     continue
 
+                if has_filters and not _record_matches_filters(
+                    rec,
+                    year_from=eff_year_from,
+                    year_to=eff_year_to,
+                    keyword_filter=eff_keyword,
+                    doc_type_filter=eff_doc_type,
+                ):
+                    continue
+
+                run_matched += 1
                 run_harvested += 1
                 if rec.pdf_urls:
                     run_pdf_found += 1
@@ -1965,6 +2143,8 @@ def harvest_oai_repository(
                         authors=rec.authors,
                         year=rec.year,
                         doi=rec.doi,
+                        doc_type=rec.doc_type,
+                        subjects=rec.subjects,
                         rights=rec.rights,
                         landing_urls=rec.urls,
                         pdf_urls=rec.pdf_urls,
@@ -1979,17 +2159,20 @@ def harvest_oai_repository(
                     hrec.authors = rec.authors or hrec.authors
                     hrec.year = rec.year or hrec.year
                     hrec.doi = rec.doi or hrec.doi
+                    hrec.doc_type = rec.doc_type or hrec.doc_type
+                    hrec.subjects = rec.subjects or hrec.subjects
                     hrec.rights = rec.rights or hrec.rights
                     hrec.landing_urls = rec.urls or hrec.landing_urls
                     hrec.pdf_urls = rec.pdf_urls or hrec.pdf_urls
                     hrec.attempts += 1
                     hrec.updated_at = datetime.now(timezone.utc)
 
-                    # Already indexed previously in this repo -> treat as duplicate, don't re-download
                     if hrec.status == "INDEXED" and hrec.document_id:
                         run_duplicates += 1
                         continue
 
+                can_download = download_pdfs and (run_downloads_attempted < eff_max_downloads)
+                had_candidate_dl = bool(hrec.pdf_urls or hrec.landing_urls)
                 pdf_acc, idx_ok, _err_code = _acquire_and_index_record(
                     db,
                     repo,
@@ -1998,7 +2181,11 @@ def harvest_oai_repository(
                     client=client,
                     resolve_dns=resolve_dns,
                     download_pdfs=download_pdfs,
+                    allow_download=can_download,
                 )
+                if can_download and had_candidate_dl and hrec.status != "DUPLICATE" and (hrec.pdf_urls or pdf_acc):
+                    run_downloads_attempted += 1
+
                 if pdf_acc:
                     run_pdf_accessible += 1
                 if idx_ok:
@@ -2011,19 +2198,26 @@ def harvest_oai_repository(
                 else:
                     run_metadata_only += 1
 
-            # Persist page progress incrementally so crashes/timeouts/pauses NEVER lose saved records!
             token = next_token
             repo.resumption_token = next_token
             repo.last_datestamp = latest_ds
             _sync_repo_counters(db, repo)
+            run_row.records_scanned = run_scanned
+            run_row.records_matched_filter = run_matched
+            run_row.records_harvested = run_harvested
+            run_row.fulltext_indexed = run_indexed
+            run_row.metadata_only = run_metadata_only
+            run_row.failed_records = run_failed
+            run_row.duplicates_skipped = run_duplicates
             _log_oai(
                 db,
                 repo.id,
                 "PAGE_COMPLETE",
-                f"Halaman {pages_fetched} selesai: {run_harvested} rekaman diproses, {run_indexed} full-text diindeks.",
+                f"Halaman {pages_fetched} selesai: {run_scanned} dipindai, {run_harvested} cocok & disimpan, {run_indexed} full-text diindeks.",
                 details={
                     "page": pages_fetched,
                     "has_next_token": bool(next_token),
+                    "run_scanned": run_scanned,
                     "run_harvested": run_harvested,
                     "run_indexed": run_indexed,
                 },
@@ -2033,39 +2227,62 @@ def harvest_oai_repository(
             if not token:
                 break
 
-        repo.last_harvested_at = datetime.now(timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        repo.last_harvested_at = now_utc
         repo.last_datestamp = latest_ds
+        if repo.schedule_enabled:
+            repo.next_scheduled_at = now_utc + timedelta(hours=max(1, int(repo.schedule_interval_hours or 24)))
         _sync_repo_counters(db, repo)
         if paused:
             repo.status = "PAUSED"
             repo.harvest_state = "PAUSED"
+            run_row.status = "PAUSED"
         else:
             repo.status = "VERIFIED"
             repo.harvest_state = "COMPLETED"
+            run_row.status = "COMPLETED"
             if run_harvested < max_records and not repo.resumption_token:
                 repo.resumption_token = None
-        repo.updated_at = datetime.now(timezone.utc)
+        run_row.records_scanned = run_scanned
+        run_row.records_matched_filter = run_matched
+        run_row.records_harvested = run_harvested
+        run_row.fulltext_indexed = run_indexed
+        run_row.metadata_only = run_metadata_only
+        run_row.failed_records = run_failed
+        run_row.duplicates_skipped = run_duplicates
+        run_row.finished_at = now_utc
+        repo.updated_at = now_utc
         _log_oai(
             db,
             repo.id,
             "HARVEST_DONE",
             (
-                f"Panen selesai ({repo.harvest_state}): {run_harvested} rekaman dipanen, "
-                f"{run_indexed} full-text diindeks, {run_metadata_only} metadata saja, "
-                f"{run_duplicates} duplikat, {run_deleted} dihapus, {run_failed} gagal PDF."
+                f"Panen selesai ({repo.harvest_state}): {run_harvested} rekaman disimpan "
+                f"(dari {run_scanned} dipindai), {run_indexed} full-text diindeks, "
+                f"{run_metadata_only} metadata saja, {run_duplicates} duplikat, {run_failed} gagal PDF."
             ),
         )
         db.commit()
     except Exception as exc:
         err_code = exc.error_code if isinstance(exc, OAIPMHProtocolError) else "HARVEST_ERROR"
         http_st = exc.http_status if isinstance(exc, OAIPMHProtocolError) else None
-        # Keep any already-saved records & resumption_token intact!
+        now_utc = datetime.now(timezone.utc)
         _sync_repo_counters(db, repo)
         repo.last_datestamp = latest_ds
         repo.status = "ERROR"
         repo.harvest_state = "ERROR"
         repo.last_error = str(exc)
-        repo.updated_at = datetime.now(timezone.utc)
+        repo.updated_at = now_utc
+        run_row.status = "ERROR"
+        run_row.records_scanned = run_scanned
+        run_row.records_matched_filter = run_matched
+        run_row.records_harvested = run_harvested
+        run_row.fulltext_indexed = run_indexed
+        run_row.metadata_only = run_metadata_only
+        run_row.failed_records = run_failed
+        run_row.duplicates_skipped = run_duplicates
+        run_row.error_message = str(exc)
+        run_row.finished_at = now_utc
         _log_oai(
             db,
             repo.id,
@@ -2080,7 +2297,10 @@ def harvest_oai_repository(
         raise
 
     return {
+        "run_id": run_row.id,
         "repository": repo.name,
+        "records_scanned": run_scanned,
+        "records_matched_filter": run_matched,
         "records_harvested": run_harvested,
         "records_seen": run_harvested,
         "fulltext_indexed": run_indexed,

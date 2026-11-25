@@ -111,6 +111,8 @@ export interface OAISampleRecord {
   authors: string[];
   year: number | null;
   doi: string | null;
+  doc_type?: string | null;
+  subjects?: string[];
   rights: string | null;
   urls: string[];
   pdf_urls: string[];
@@ -192,11 +194,78 @@ export interface OAIRepositoryItem {
   failed_records_count?: number;
   rate_limit_delay_sec?: number;
   request_timeout_sec?: number;
+  year_from?: number | null;
+  year_to?: number | null;
+  keyword_filter?: string | null;
+  doc_type_filter?: string | null;
+  max_downloads?: number;
+  schedule_enabled?: boolean;
+  schedule_interval_hours?: number;
+  next_scheduled_at?: string | null;
   funnel?: OAIRepositoryFunnel;
   status: string;
   last_error: string | null;
   created_at: string | null;
   updated_at?: string | null;
+}
+
+export interface RepositoryCatalogItem {
+  id: string;
+  university: string;
+  name: string;
+  base_url: string;
+  platform: string;
+  platform_label: string;
+  description: string | null;
+  oai_status: "UNVERIFIED" | "VERIFIED" | "PARTIAL" | "ERROR" | string;
+  identified_name: string | null;
+  collections_count: number;
+  supported_formats: string[];
+  available_sets: Array<{ setSpec: string; setName: string }>;
+  last_error: string | null;
+  last_tested_at: string | null;
+  is_custom: boolean;
+  already_in_personal: boolean;
+  created_at: string | null;
+}
+
+export interface OAIHarvestRunItem {
+  id: string;
+  repository_id: string;
+  trigger_mode: string;
+  status: string;
+  set_spec: string | null;
+  metadata_prefix: string | null;
+  filters_snapshot: Record<string, unknown>;
+  records_scanned: number;
+  records_matched_filter: number;
+  records_harvested: number;
+  fulltext_indexed: number;
+  metadata_only: number;
+  failed_records: number;
+  duplicates_skipped: number;
+  error_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface OAIIndexedDocumentItem {
+  document_id: string;
+  oai_identifier: string;
+  university: string;
+  repository_name: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  doc_type: string | null;
+  url: string | null;
+  license: string | null;
+  retrieved_at: string | null;
+  word_count: number;
+  page_count: number;
+  indexing_status: string;
+  compared_checks_count: number;
 }
 
 export interface OAIHarvestRecordItem {
@@ -211,6 +280,8 @@ export interface OAIHarvestRecordItem {
   authors: string[];
   year: number | null;
   doi: string | null;
+  doc_type?: string | null;
+  subjects?: string[];
   rights: string | null;
   landing_urls: string[];
   pdf_urls: string[];

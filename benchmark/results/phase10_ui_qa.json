@@ -78,14 +78,14 @@
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/repositories/d9099a36-2e5c-4704-b6a1-3a731fbb2d6c",
+      "route": "/repositories/910fc323-c505-4c07-9ee5-3d533f96d814",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/reports/c370a830-1625-4d09-a351-a8f5ec4a0be3",
+      "route": "/reports/a8ea48b3-73e4-4e68-946b-040c34a80d89",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true
@@ -156,6 +156,7 @@
     "20_dashboard_dark_collapsed.png",
     "21_report_detail_annotated_text.png",
     "22_repositories_add_modal.png",
-    "23_repository_detail.png"
+    "23_repository_detail.png",
+    "24_repositories_catalog.png"
   ]
 }
