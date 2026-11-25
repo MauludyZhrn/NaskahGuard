@@ -66,7 +66,15 @@ export const OAIWizardView: React.FC<OAIWizardViewProps> = ({ report, showSample
           <p className="text-xs text-muted-foreground break-all">
             Endpoint teruji: <span className="font-mono text-foreground">{report.effective_url}</span>
             {report.recommended_prefix ? ` · Format disarankan: ${report.recommended_prefix}` : ""}
+            {report.record_count_estimate !== undefined && report.record_count_estimate !== null
+              ? ` · Estimasi record: ${report.record_count_estimate.toLocaleString("id-ID")}`
+              : ""}
           </p>
+          {report.failure_category_label && (
+            <p className="text-xs font-medium text-destructive">
+              Kategori kendala: {report.failure_category_label}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3 text-xs tabular-nums">
           <span className="text-emerald-700 dark:text-emerald-400 font-medium">
@@ -96,6 +104,11 @@ export const OAIWizardView: React.FC<OAIWizardViewProps> = ({ report, showSample
                 {st.http_status !== null && st.http_status !== undefined && (
                   <Badge variant="outline" className="font-mono text-[11px]">
                     HTTP {st.http_status}
+                  </Badge>
+                )}
+                {st.error_category_label && (
+                  <Badge variant="secondary" className="text-[11px]">
+                    {st.error_category_label}
                   </Badge>
                 )}
                 {st.error_code && (

@@ -148,17 +148,68 @@ OAI_ERROR_CATALOG: dict[str, tuple[str, str]] = {
     ),
     "CONNECTION_ERROR": (
         "Gagal terhubung ke server repositori.",
-        "Pastikan URL benar, sertifikat SSL valid, dan server tidak sedang down.",
+        "Pastikan URL benar, sertifikat SSL/TLS valid, dan server tidak sedang down.",
+    ),
+    "TLS_ERROR": (
+        "Jabat tangan HTTPS / verifikasi sertifikat TLS gagal.",
+        "Periksa masa berlaku sertifikat HTTPS server repositori atau gunakan endpoint HTTPS resmi terbaru.",
     ),
     "REDIRECT_LIMIT": (
         "Terlalu banyak pengalihan (redirect) saat mengakses endpoint.",
         "Masukkan langsung URL tujuan akhir setelah redirect.",
     ),
+    "POLICY_RESTRICTED": (
+        "Kebijakan repositori membatasi pengunduhan massal full-text oleh robot otomatis.",
+        "Gunakan mode Metadata Saja (default) untuk menjaga atribusi dan tautan sumber asli.",
+    ),
+}
+
+OAI_ERROR_CATEGORIES: dict[str, tuple[str, str]] = {
+    "HTTP_CONNECTION_FAILURE": (
+        "HTTP_CONNECTION_FAILURE",
+        "Kegagalan Koneksi HTTP / Jaringan",
+    ),
+    "OAI_PROTOCOL_FAILURE": (
+        "OAI_PROTOCOL_FAILURE",
+        "Kegagalan Protokol OAI-PMH",
+    ),
+    "METADATA_PARSING_FAILURE": (
+        "METADATA_PARSING_FAILURE",
+        "Kegagalan Parsing Metadata / XML",
+    ),
+    "FULLTEXT_ACCESS_RESTRICTION": (
+        "FULLTEXT_ACCESS_RESTRICTION",
+        "Pembatasan Akses / Kebijakan Full-Text",
+    ),
 }
 
 
+def classify_oai_error(error_code: str | None) -> tuple[str | None, str | None]:
+    if not error_code:
+        return None, None
+    if error_code in {
+        "TIMEOUT",
+        "DNS_ERROR",
+        "CONNECTION_ERROR",
+        "TLS_ERROR",
+        "HTTP_404",
+        "HTTP_429",
+        "HTTP_5XX",
+        "HTTP_ERROR",
+        "REDIRECT_LIMIT",
+        "INVALID_URL",
+        "SSRF_BLOCKED",
+    }:
+        return OAI_ERROR_CATEGORIES["HTTP_CONNECTION_FAILURE"]
+    if error_code in {"XML_PARSE_ERROR", "METADATA_PARSING_ERROR"}:
+        return OAI_ERROR_CATEGORIES["METADATA_PARSING_FAILURE"]
+    if error_code in {"POLICY_RESTRICTED", "PDF_INACCESSIBLE", "HTTP_401"}:
+        return OAI_ERROR_CATEGORIES["FULLTEXT_ACCESS_RESTRICTION"]
+    return OAI_ERROR_CATEGORIES["OAI_PROTOCOL_FAILURE"]
+
+
 class OAIPMHProtocolError(ValueError):
-    """Structured OAI-PMH / transport error carrying Bahasa Indonesia explanation & suggested fix."""
+    """Structured OAI-PMH / transport error carrying Bahasa Indonesia explanation, category & fix."""
 
     def __init__(
         self,
@@ -168,6 +219,7 @@ class OAIPMHProtocolError(ValueError):
         suggestion: str | None = None,
         http_status: int | None = None,
         raw_detail: str | None = None,
+        error_category: str | None = None,
     ) -> None:
         default_msg, default_sug = OAI_ERROR_CATALOG.get(
             error_code,
@@ -176,7 +228,14 @@ class OAIPMHProtocolError(ValueError):
                 "Periksa kembali URL endpoint dan log aktivitas untuk detail teknis.",
             ),
         )
+        cat_code, cat_label = (
+            OAI_ERROR_CATEGORIES.get(error_category, classify_oai_error(error_code))
+            if error_category
+            else classify_oai_error(error_code)
+        )
         self.error_code = error_code
+        self.error_category = cat_code
+        self.error_category_label = cat_label
         self.message = message or default_msg
         self.suggestion = suggestion or default_sug
         self.http_status = http_status
@@ -186,6 +245,8 @@ class OAIPMHProtocolError(ValueError):
     def to_dict(self) -> dict[str, Any]:
         return {
             "error_code": self.error_code,
+            "error_category": self.error_category,
+            "error_category_label": self.error_category_label,
             "message": self.message,
             "suggestion": self.suggestion,
             "http_status": self.http_status,
@@ -232,8 +293,8 @@ def platform_label(platform: str | None) -> str:
 def clean_oai_base_url(raw_url: str) -> tuple[str, bool]:
     """Return (cleaned_base_url, changed) without mutating user's input silently.
 
-    Strips surrounding whitespace and OAI-PMH query verbs (?verb=Identify etc.) so the base URL
-    can be cleanly reused for subsequent OAI requests.
+    Strips surrounding whitespace, redundant default ports (:443 on https / :80 on http),
+    and OAI-PMH query verbs (?verb=Identify etc.) so the base URL can be cleanly reused.
     """
     trimmed = (raw_url or "").strip()
     if not trimmed:
@@ -241,11 +302,17 @@ def clean_oai_base_url(raw_url: str) -> tuple[str, bool]:
     parsed = urlparse(trimmed)
     if not parsed.scheme:
         return trimmed, False
+    netloc = parsed.netloc
+    scheme = parsed.scheme.lower()
+    if scheme == "https" and netloc.endswith(":443"):
+        netloc = netloc[:-4]
+    elif scheme == "http" and netloc.endswith(":80"):
+        netloc = netloc[:-3]
     q_pairs = parse_qsl(parsed.query, keep_blank_values=True)
     oai_params = {"verb", "metadataprefix", "set", "from", "until", "resumptiontoken", "identifier"}
     kept = [(k, v) for k, v in q_pairs if k.lower() not in oai_params]
     new_query = "&".join(f"{k}={v}" for k, v in kept)
-    cleaned = urlunparse((parsed.scheme, parsed.netloc, parsed.path or "/", "", new_query, ""))
+    cleaned = urlunparse((scheme, netloc, parsed.path or "/", "", new_query, ""))
     # Keep root slash only when path was empty; remove trailing ? if query stripped
     if not parsed.path and cleaned.endswith("/"):
         cleaned = cleaned[:-1]
@@ -441,12 +508,16 @@ class OAIPMHClient:
                 except httpx.TimeoutException as exc:
                     raise OAIPMHProtocolError("TIMEOUT", raw_detail=str(exc)) from exc
                 except httpx.ConnectError as exc:
-                    low = str(exc).lower()
+                    raw = str(exc)
+                    low = raw.lower()
                     if "getaddrinfo" in low or "name or service not known" in low or "nodename" in low:
-                        raise OAIPMHProtocolError("DNS_ERROR", raw_detail=str(exc)) from exc
-                    raise OAIPMHProtocolError("CONNECTION_ERROR", raw_detail=str(exc)) from exc
+                        raise OAIPMHProtocolError("DNS_ERROR", f"Gagal resolusi DNS: {raw}", raw_detail=raw) from exc
+                    if "ssl" in low or "certificate" in low or "tls" in low or "handshake" in low:
+                        raise OAIPMHProtocolError("TLS_ERROR", f"Kegagalan TLS/HTTPS: {raw}", raw_detail=raw) from exc
+                    raise OAIPMHProtocolError("CONNECTION_ERROR", f"Kegagalan koneksi HTTP: {raw}", raw_detail=raw) from exc
                 except httpx.HTTPError as exc:
-                    raise OAIPMHProtocolError("CONNECTION_ERROR", raw_detail=str(exc)) from exc
+                    raw = str(exc)
+                    raise OAIPMHProtocolError("CONNECTION_ERROR", f"Kesalahan transportasi HTTP: {raw}", raw_detail=raw) from exc
 
                 if resp.status_code in {301, 302, 303, 307, 308}:
                     location = resp.headers.get("location")
@@ -935,11 +1006,17 @@ def _make_stage(
     *,
     http_status: int | None = None,
     error_code: str | None = None,
+    error_category: str | None = None,
     message: str = "",
     suggestion: str | None = None,
     duration_ms: int = 0,
     data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    cat_code, cat_label = (
+        OAI_ERROR_CATEGORIES.get(error_category, classify_oai_error(error_code))
+        if error_category
+        else classify_oai_error(error_code)
+    )
     return {
         "step": step,
         "key": key,
@@ -947,6 +1024,8 @@ def _make_stage(
         "status": status,  # PASS | WARN | FAIL | SKIP
         "http_status": http_status,
         "error_code": error_code,
+        "error_category": cat_code,
+        "error_category_label": cat_label,
         "message": message,
         "suggestion": suggestion,
         "duration_ms": duration_ms,
@@ -1239,6 +1318,7 @@ def run_connection_wizard(
     parsed_records: list[OAIRecord] = []
     deleted_count = 0
     has_resumption_token = False
+    complete_list_size: int | None = None
     try:
         params6: dict[str, str] = {"verb": "ListRecords", "metadataPrefix": recommended_prefix}
         if set_spec:
@@ -1253,8 +1333,12 @@ def run_connection_wizard(
                         deleted_count += 1
                     else:
                         parsed_records.append(rec)
-            elif ln == "resumptionToken" and (el.text or "").strip():
-                has_resumption_token = True
+            elif ln == "resumptionToken":
+                if (el.text or "").strip():
+                    has_resumption_token = True
+                cls_raw = (el.attrib.get("completeListSize") or "").strip()
+                if cls_raw.isdigit():
+                    complete_list_size = int(cls_raw)
         stages.append(
             _make_stage(
                 6,
@@ -1264,6 +1348,7 @@ def run_connection_wizard(
                 http_status=sc6,
                 message=(
                     f"Berhasil mengambil {len(parsed_records)} rekaman aktif"
+                    + (f" dari estimasi {complete_list_size} total" if complete_list_size else "")
                     + (f" ({deleted_count} dihapus)" if deleted_count else "")
                     + (" dengan dukungan paginasi resumptionToken." if has_resumption_token else ".")
                 ),
@@ -1273,6 +1358,8 @@ def run_connection_wizard(
                     "active_records": len(parsed_records),
                     "deleted_records": deleted_count,
                     "has_resumption_token": has_resumption_token,
+                    "complete_list_size": complete_list_size,
+                    "record_count_estimate": complete_list_size if complete_list_size is not None else len(parsed_records),
                     "metadata_prefix_used": recommended_prefix,
                 },
             )
@@ -1470,6 +1557,14 @@ def _finalize_wizard_report(
     warn_count = sum(1 for s in stages if s["status"] == "WARN")
     pass_count = sum(1 for s in stages if s["status"] == "PASS")
 
+    st6 = next((s for s in stages if s.get("key") == "test_list_records"), None)
+    st6_data = (st6 or {}).get("data") or {}
+    rec_estimate = st6_data.get("record_count_estimate")
+    if rec_estimate is None:
+        rec_estimate = st6_data.get("active_records")
+
+    failed_stage = next((s for s in stages if s["status"] == "FAIL"), None)
+
     # Core stages 1, 2, 3 must pass for READY/PARTIAL
     core_ok = all(s["status"] == "PASS" for s in stages if s["step"] in {1, 2, 3})
     if fail_count == 0 and warn_count == 0:
@@ -1492,7 +1587,11 @@ def _finalize_wizard_report(
         "recommended_prefix": recommended_prefix,
         "supported_formats": supported_formats,
         "available_sets": available_sets,
+        "record_count_estimate": rec_estimate,
         "sample_records": sample_records,
+        "failure_category": (failed_stage or {}).get("error_category"),
+        "failure_category_label": (failed_stage or {}).get("error_category_label"),
+        "failure_message": (failed_stage or {}).get("message"),
         "stages": stages,
         "tested_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1887,7 +1986,8 @@ def harvest_oai_repository(
     *,
     max_records: int = 20,
     max_downloads: int | None = None,
-    download_pdfs: bool = True,
+    download_pdfs: bool | None = None,
+    policy_override_confirmed: bool = False,
     resume: bool = False,
     reset_cursor: bool = False,
     incremental: bool = True,
@@ -1901,11 +2001,21 @@ def harvest_oai_repository(
     client: httpx.Client | None = None,
     resolve_dns: bool = True,
 ) -> dict[str, Any]:
-    """Fault-tolerant, resumable OAI-PMH 2.0 harvester with Phase 10.4 filters, download limits, and run history."""
+    """Fault-tolerant, policy-aware OAI-PMH 2.0 harvester with Phase 10.4.1 policy guardrails."""
+    eff_download_pdfs = bool(repo.default_download_pdfs if download_pdfs is None else download_pdfs)
+    policy_blocked_pdf = False
+    if (
+        getattr(repo, "harvesting_permission_status", "OPEN_UNRESTRICTED") == "METADATA_ALLOWED_FULLTEXT_RESTRICTED"
+        and eff_download_pdfs
+        and not policy_override_confirmed
+    ):
+        eff_download_pdfs = False
+        policy_blocked_pdf = True
+
     oai = OAIPMHClient(
         client=client,
         resolve_dns=resolve_dns,
-        timeout_sec=float(repo.request_timeout_sec or 20),
+        timeout_sec=float(repo.request_timeout_sec or 30),
         rate_limit_delay_sec=float(repo.rate_limit_delay_sec or 0.0) if client is None else 0.0,
     )
 
@@ -1925,7 +2035,7 @@ def harvest_oai_repository(
         if max_downloads is not None
         else (repo.max_downloads if repo.max_downloads is not None else max_records)
     )
-    eff_max_downloads = max(0, min(eff_max_downloads, max_records))
+    eff_max_downloads = max(0, min(eff_max_downloads, max_records)) if eff_download_pdfs else 0
 
     # Bound scanned records so broad filters cannot scan an unbounded repository indefinitely
     max_scan_budget = max(max_records * 5, 100)
@@ -1943,6 +2053,7 @@ def harvest_oai_repository(
             "doc_type_filter": eff_doc_type,
             "max_records": max_records,
             "max_downloads": eff_max_downloads,
+            "download_pdfs": eff_download_pdfs,
             "incremental": incremental,
         },
         started_at=datetime.now(timezone.utc),
@@ -1953,11 +2064,20 @@ def harvest_oai_repository(
     repo.harvest_state = "RUNNING"
     repo.last_error = None
     repo.updated_at = datetime.now(timezone.utc)
+    if policy_blocked_pdf:
+        _log_oai(
+            db,
+            repo.id,
+            "POLICY_METADATA_ONLY",
+            "Kebijakan repositori melarang panen massal PDF oleh robot tanpa izin; dialihkan otomatis ke mode Metadata Saja sambil mempertahankan URL sumber asli.",
+            level="WARN",
+            error_code="POLICY_RESTRICTED",
+        )
     _log_oai(
         db,
         repo.id,
         "HARVEST_START",
-        f"Memulai panen {run_row.trigger_mode} (maks {max_records} rekaman, maks {eff_max_downloads} unduhan PDF, format {effective_prefix}"
+        f"Memulai panen {run_row.trigger_mode} (maks {max_records} rekaman, mode={'Metadata+PDF maks ' + str(eff_max_downloads) if eff_download_pdfs else 'Metadata Saja'}, format {effective_prefix}"
         + (f", koleksi {effective_set}" if effective_set else "")
         + (f", tahun {eff_year_from or '*'}–{eff_year_to or '*'}" if (eff_year_from or eff_year_to) else "")
         + (f", kata kunci '{eff_keyword}'" if eff_keyword else "")
@@ -2171,7 +2291,7 @@ def harvest_oai_repository(
                         run_duplicates += 1
                         continue
 
-                can_download = download_pdfs and (run_downloads_attempted < eff_max_downloads)
+                can_download = eff_download_pdfs and (run_downloads_attempted < eff_max_downloads)
                 had_candidate_dl = bool(hrec.pdf_urls or hrec.landing_urls)
                 pdf_acc, idx_ok, _err_code = _acquire_and_index_record(
                     db,
@@ -2180,7 +2300,7 @@ def harvest_oai_repository(
                     oai=oai,
                     client=client,
                     resolve_dns=resolve_dns,
-                    download_pdfs=download_pdfs,
+                    download_pdfs=eff_download_pdfs,
                     allow_download=can_download,
                 )
                 if can_download and had_candidate_dl and hrec.status != "DUPLICATE" and (hrec.pdf_urls or pdf_acc):

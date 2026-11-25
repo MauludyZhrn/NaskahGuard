@@ -24,7 +24,24 @@ from app.sources.ssrf import validate_public_url
 
 # Real official public endpoints verified in official .ac.id / open directories.
 # All entries start as oai_status="UNVERIFIED" until explicitly tested by the user or probe!
-INITIAL_CATALOG_SEEDS: list[dict[str, str]] = [
+INITIAL_CATALOG_SEEDS: list[dict[str, Any]] = [
+    {
+        "university": "Universitas Diponegoro (UNDIP)",
+        "name": "UNDIP Institutional Repository",
+        "base_url": "https://eprints2.undip.ac.id/cgi/oai2",
+        "legacy_url": "http://eprints.undip.ac.id/cgi/oai2",
+        "platform": "eprints",
+        "policy_url": "https://eprints2.undip.ac.id/policies.html",
+        "fulltext_policy": "METADATA_ONLY_DEFAULT",
+        "harvesting_permission_status": "METADATA_ALLOWED_FULLTEXT_RESTRICTED",
+        "default_download_pdfs": False,
+        "requires_verification_before_save": True,
+        "description": (
+            "Repositori institusional resmi Universitas Diponegoro (EPrints2). "
+            "Endpoint lama (http://eprints.undip.ac.id/cgi/oai2) mengarah 301 ke endpoint HTTPS baru ini. "
+            "Sesuai policies.html UNDIP, metadata terbuka non-komersial dengan atribusi, sedangkan panen massal full-text oleh robot dibatasi."
+        ),
+    },
     {
         "university": "Universitas Negeri Yogyakarta (UNY)",
         "name": "Jurnal Pendidikan Vokasi Otomotif (OJS UNY)",
@@ -98,24 +115,70 @@ INITIAL_CATALOG_SEEDS: list[dict[str, str]] = [
 ]
 
 
+def fulltext_policy_label(policy: str | None) -> str:
+    return {
+        "METADATA_ONLY_DEFAULT": "Metadata Saja (Default Kebijakan)",
+        "OPEN_PUBLIC_PDF": "Full-Text Publik Terbuka",
+        "RESTRICTED": "Full-Text Terbatas",
+    }.get(policy or "", "Full-Text Publik Terbuka")
+
+
+def permission_status_label(perm: str | None) -> str:
+    return {
+        "METADATA_ALLOWED_FULLTEXT_RESTRICTED": "Metadata Diizinkan · Panen Robot PDF Dibatasi",
+        "OPEN_UNRESTRICTED": "Terbuka untuk Metadata & Full-Text Publik",
+        "MANUAL_PERMISSION_REQUIRED": "Memerlukan Izin Pengelola Repositori",
+    }.get(perm or "", "Terbuka untuk Metadata & Full-Text Publik")
+
+
 def ensure_catalog_seeded(db: Session) -> int:
     """Idempotently seed official catalog entries with status UNVERIFIED (never pre-marked active)."""
-    existing_urls = {
-        row[0] for row in db.query(RepositoryCatalogEntry.base_url).all()
+    existing_by_url = {
+        row.base_url: row for row in db.query(RepositoryCatalogEntry).all()
     }
-    added = 0
+    changed = 0
     for item in INITIAL_CATALOG_SEEDS:
-        if item["base_url"] in existing_urls:
-            continue
         plat = normalize_repo_type(item["platform"])
+        existing = existing_by_url.get(item["base_url"])
+        if existing is not None:
+            # Backfill newly added policy fields for preset entries if upgraded from Phase 10.4
+            updated_row = False
+            if item.get("legacy_url") and not existing.legacy_url:
+                existing.legacy_url = item["legacy_url"]
+                updated_row = True
+            if item.get("policy_url") and not existing.policy_url:
+                existing.policy_url = item["policy_url"]
+                updated_row = True
+            if item.get("fulltext_policy") and existing.fulltext_policy != item["fulltext_policy"]:
+                existing.fulltext_policy = item["fulltext_policy"]
+                updated_row = True
+            if item.get("harvesting_permission_status") and existing.harvesting_permission_status != item["harvesting_permission_status"]:
+                existing.harvesting_permission_status = item["harvesting_permission_status"]
+                updated_row = True
+            if "default_download_pdfs" in item and existing.default_download_pdfs != bool(item["default_download_pdfs"]):
+                existing.default_download_pdfs = bool(item["default_download_pdfs"])
+                updated_row = True
+            if "requires_verification_before_save" in item and existing.requires_verification_before_save != bool(item["requires_verification_before_save"]):
+                existing.requires_verification_before_save = bool(item["requires_verification_before_save"])
+                updated_row = True
+            if updated_row:
+                changed += 1
+            continue
+
         db.add(
             RepositoryCatalogEntry(
                 university=item["university"],
                 name=item["name"],
                 base_url=item["base_url"],
+                legacy_url=item.get("legacy_url"),
                 platform=plat,
                 platform_label=platform_label(plat),
                 description=item.get("description"),
+                policy_url=item.get("policy_url"),
+                fulltext_policy=item.get("fulltext_policy", "OPEN_PUBLIC_PDF"),
+                harvesting_permission_status=item.get("harvesting_permission_status", "OPEN_UNRESTRICTED"),
+                default_download_pdfs=bool(item.get("default_download_pdfs", True)),
+                requires_verification_before_save=bool(item.get("requires_verification_before_save", False)),
                 oai_status="UNVERIFIED",
                 collections_count=0,
                 supported_formats=[],
@@ -123,10 +186,10 @@ def ensure_catalog_seeded(db: Session) -> int:
                 is_custom=False,
             )
         )
-        added += 1
-    if added:
+        changed += 1
+    if changed:
         db.commit()
-    return added
+    return changed
 
 
 def serialize_catalog_entry(entry: RepositoryCatalogEntry, *, personal_urls: set[str] | None = None) -> dict[str, Any]:
@@ -135,9 +198,18 @@ def serialize_catalog_entry(entry: RepositoryCatalogEntry, *, personal_urls: set
         "university": entry.university,
         "name": entry.name,
         "base_url": entry.base_url,
+        "legacy_url": entry.legacy_url,
         "platform": entry.platform,
         "platform_label": entry.platform_label or platform_label(entry.platform),
         "description": entry.description,
+        "policy_url": entry.policy_url,
+        "fulltext_policy": entry.fulltext_policy or "OPEN_PUBLIC_PDF",
+        "fulltext_policy_label": fulltext_policy_label(entry.fulltext_policy),
+        "harvesting_permission_status": entry.harvesting_permission_status or "OPEN_UNRESTRICTED",
+        "harvesting_permission_label": permission_status_label(entry.harvesting_permission_status),
+        "default_download_pdfs": bool(entry.default_download_pdfs),
+        "requires_verification_before_save": bool(entry.requires_verification_before_save),
+        "record_count_estimate": entry.record_count_estimate,
         "oai_status": entry.oai_status,
         "identified_name": entry.identified_name,
         "collections_count": entry.collections_count,
@@ -159,6 +231,12 @@ def add_catalog_entry(
     base_url: str,
     platform: str = "other",
     description: str | None = None,
+    legacy_url: str | None = None,
+    policy_url: str | None = None,
+    fulltext_policy: str = "OPEN_PUBLIC_PDF",
+    harvesting_permission_status: str = "OPEN_UNRESTRICTED",
+    default_download_pdfs: bool = True,
+    requires_verification_before_save: bool = False,
 ) -> RepositoryCatalogEntry:
     clean_url = validate_public_url(base_url, resolve_dns=False)
     existing = db.query(RepositoryCatalogEntry).filter(RepositoryCatalogEntry.base_url == clean_url).first()
@@ -171,9 +249,15 @@ def add_catalog_entry(
         university=university.strip(),
         name=name.strip(),
         base_url=clean_url,
+        legacy_url=legacy_url.strip() if legacy_url else None,
         platform=norm_plat,
         platform_label=platform_label(norm_plat),
         description=(description or "").strip() or None,
+        policy_url=policy_url.strip() if policy_url else None,
+        fulltext_policy=fulltext_policy,
+        harvesting_permission_status=harvesting_permission_status,
+        default_download_pdfs=default_download_pdfs,
+        requires_verification_before_save=requires_verification_before_save,
         oai_status="UNVERIFIED",
         collections_count=0,
         supported_formats=[],
@@ -192,7 +276,7 @@ def test_catalog_entry(
     *,
     client: httpx.Client | None = None,
     resolve_dns: bool = True,
-    timeout_sec: float = 20.0,
+    timeout_sec: float = 35.0,
 ) -> tuple[RepositoryCatalogEntry, dict[str, Any]]:
     """Run live 8-stage OAI-PMH test on a catalog entry and persist real observed results."""
     report = run_connection_wizard(
@@ -213,6 +297,8 @@ def test_catalog_entry(
     if isinstance(report.get("available_sets"), list):
         entry.available_sets = report["available_sets"][:100]
         entry.collections_count = len(report["available_sets"])
+    if report.get("record_count_estimate") is not None:
+        entry.record_count_estimate = int(report["record_count_estimate"])
 
     if report["overall_status"] == "READY":
         entry.oai_status = "VERIFIED"
@@ -224,7 +310,9 @@ def test_catalog_entry(
     else:
         entry.oai_status = "ERROR"
         fail_st = next((s for s in report["stages"] if s["status"] == "FAIL"), None)
-        entry.last_error = (fail_st or {}).get("message") or "Koneksi gagal."
+        cat_lbl = (fail_st or {}).get("error_category_label")
+        msg = (fail_st or {}).get("message") or "Koneksi gagal."
+        entry.last_error = f"[{cat_lbl}] {msg}" if cat_lbl else msg
 
     db.commit()
     db.refresh(entry)
@@ -254,9 +342,16 @@ def promote_catalog_entry_to_personal(
     mapped_status = (
         "VERIFIED" if entry.oai_status in {"VERIFIED", "PARTIAL"} else ("ERROR" if entry.oai_status == "ERROR" else "UNVERIFIED")
     )
+    default_timeout = 45 if (entry.platform == "eprints" or "undip.ac.id" in entry.base_url) else 25
     repo = OAIRepository(
         name=entry.name,
         base_url=entry.base_url,
+        legacy_url=entry.legacy_url,
+        policy_url=entry.policy_url,
+        fulltext_policy=entry.fulltext_policy or "OPEN_PUBLIC_PDF",
+        harvesting_permission_status=entry.harvesting_permission_status or "OPEN_UNRESTRICTED",
+        default_download_pdfs=bool(entry.default_download_pdfs),
+        record_count_estimate=entry.record_count_estimate,
         repo_type=entry.platform or "other",
         platform_detected=entry.platform,
         identified_name=entry.identified_name or entry.university,
@@ -264,6 +359,7 @@ def promote_catalog_entry_to_personal(
         selected_set=(selected_set or "").strip() or None,
         supported_formats=entry.supported_formats or [],
         available_sets=entry.available_sets or [],
+        request_timeout_sec=default_timeout,
         status=mapped_status,
         harvest_state="IDLE",
         last_error=entry.last_error if mapped_status == "ERROR" else None,
@@ -276,7 +372,10 @@ def promote_catalog_entry_to_personal(
             repository_id=repo.id,
             level="INFO",
             stage="CATALOG_ADD",
-            message=f"Ditambahkan dari Katalog Repositori ({entry.university}).",
+            message=(
+                f"Ditambahkan dari Katalog Repositori ({entry.university}). "
+                f"Kebijakan full-text: {fulltext_policy_label(repo.fulltext_policy)}."
+            ),
         )
     )
     db.commit()

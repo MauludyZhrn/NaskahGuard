@@ -261,7 +261,10 @@ export const RepositoryDetailPage: React.FC = () => {
         body: JSON.stringify({
           max_records: Number(maxRecords) || 15,
           max_downloads: Number(maxDownloads) >= 0 ? Number(maxDownloads) : 10,
-          download_pdfs: true,
+          download_pdfs:
+            repo.harvesting_permission_status === "METADATA_ALLOWED_FULLTEXT_RESTRICTED"
+              ? false
+              : (repo.default_download_pdfs ?? true),
           resume: mode === "resume",
           incremental,
           set_spec: selectedSet.trim() || null,
@@ -449,6 +452,85 @@ export const RepositoryDetailPage: React.FC = () => {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {repo.harvesting_permission_status === "METADATA_ALLOWED_FULLTEXT_RESTRICTED" && (
+          <Alert>
+            <AlertCircle className="size-4" aria-hidden="true" />
+            <AlertTitle>Kebijakan Data: Mode Metadata Saja (Default)</AlertTitle>
+            <AlertDescription className="flex flex-wrap items-center gap-2">
+              <span>
+                {repo.harvesting_permission_label || "Metadata diizinkan dengan atribusi; panen massal PDF oleh robot dibatasi oleh kebijakan repositori."}
+              </span>
+              {repo.policy_url && (
+                <a href={repo.policy_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline">
+                  <span>Lihat Kebijakan Resmi</span>
+                  <ExternalLink className="size-3" aria-hidden="true" />
+                </a>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Info Ringkas Kebijakan, Format & Estimasi */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="shadow-none">
+            <CardHeader className="pb-1.5 pt-3">
+              <CardDescription className="text-xs">Status Koneksi &amp; Format</CardDescription>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Badge variant={repo.status === "VERIFIED" ? "default" : repo.status === "ERROR" ? "destructive" : "outline"}>
+                  {repo.status}
+                </Badge>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {(repo.supported_formats || []).length} format
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 flex flex-wrap gap-1">
+              {(repo.supported_formats || [repo.metadata_prefix]).slice(0, 5).map((f) => (
+                <Badge key={f} variant="secondary" className="font-mono text-[10px]">{f}</Badge>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-none">
+            <CardHeader className="pb-1.5 pt-3">
+              <CardDescription className="text-xs">Jumlah Koleksi &amp; Rekaman</CardDescription>
+              <CardTitle className="text-sm tabular-nums">
+                {(repo.available_sets || []).length} koleksi ·{" "}
+                {repo.record_count_estimate !== null && repo.record_count_estimate !== undefined
+                  ? `${repo.record_count_estimate.toLocaleString("id-ID")} est.`
+                  : `${repo.records_harvested} dipanen`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 text-xs text-muted-foreground">
+              Terpanen: {repo.records_harvested} · Diindeks: {repo.fulltext_indexed}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-none">
+            <CardHeader className="pb-1.5 pt-3">
+              <CardDescription className="text-xs">Kebijakan Full-Text</CardDescription>
+              <CardTitle className="text-sm">
+                {repo.fulltext_policy_label || "Full-Text Publik Terbuka"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 text-xs text-muted-foreground">
+              {repo.default_download_pdfs ? "Unduh PDF terbuka aktif" : "Mode default: Metadata Saja"}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-none">
+            <CardHeader className="pb-1.5 pt-3">
+              <CardDescription className="text-xs">Status Izin Panen</CardDescription>
+              <CardTitle className="text-sm">
+                {repo.harvesting_permission_label || "Terbuka untuk Metadata & Full-Text"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-3 text-xs text-muted-foreground">
+              {repo.legacy_url ? `Endpoint lama: ${repo.legacy_url}` : repo.identified_name || repo.name}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Monitor Panen + Funnel 7 Tahap + Jadwal Opsional */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

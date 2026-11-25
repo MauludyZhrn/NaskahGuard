@@ -130,8 +130,8 @@ npm run build
 .\backend\.venv\Scripts\python.exe benchmark\run_phase10_ui_qa.py
 ```
 
-### Ringkasan Hasil Pengujian Terakhir (Phase 10.4)
-- **Pytest Backend:** `59 passed, 1 skipped, 0 failed` (`1 test_live_internet_providers_explicit` hanya berjalan bila flag live diaktifkan).
+### Ringkasan Hasil Pengujian Terakhir (Phase 10.4.1)
+- **Pytest Backend:** `62 passed, 1 skipped, 0 failed` (`1 test_live_internet_providers_explicit` hanya berjalan bila flag live diaktifkan).
 - **Validasi OAI-PMH Live:**
   - **OJS** (`journal.uny.ac.id/index.php/jpvo/oai`): Tervalidasi full-text hingga uji plagiasi (`94.53%` SI).
   - **EPrints** (`digilib.uin-suka.ac.id/cgi/oai2`): Tervalidasi full-text hingga uji plagiasi (`94.44%` SI).
@@ -146,7 +146,7 @@ npm run build
 ```text
 NaskahGuard/
 ├── backend/
-│   ├── alembic/              # Migrasi skema SQLite (0001 s.d. 0005)
+│   ├── alembic/              # Migrasi skema SQLite (0001 s.d. 0006)
 │   ├── app/
 │   │   ├── ai_detection/     # Engine deteksi tulisan AI lokal & model registry
 │   │   ├── api/              # Endpoint REST FastAPI (checks, reports, corpus, oai, providers, dll.)
@@ -176,7 +176,7 @@ NaskahGuard/
 - **Arsitektur & Spesifikasi:** [ARCHITECTURE.md](docs/ARCHITECTURE.md), [API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md), [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md), [SECURITY_AND_PRIVACY.md](docs/SECURITY_AND_PRIVACY.md)
 - **Mesin Kemiripan & Skor:** [ALGORITHM_DESIGN.md](docs/ALGORITHM_DESIGN.md), [SIMILARITY_SCORING.md](docs/SIMILARITY_SCORING.md), [SOURCE_DISCOVERY.md](docs/SOURCE_DISCOVERY.md)
 - **Deteksi AI & OCR:** [AI_DETECTION_ARCHITECTURE.md](docs/AI_DETECTION_ARCHITECTURE.md), [PHASE10_2_AI_VALIDATION.md](docs/PHASE10_2_AI_VALIDATION.md), [PHASE10_2_OCR_REPORT.md](docs/PHASE10_2_OCR_REPORT.md)
-- **Repositori Akademik Indonesia (Phase 10.3–10.4):** [PHASE10_3_REPOSITORY_AUDIT.md](docs/PHASE10_3_REPOSITORY_AUDIT.md), [PHASE10_4_PLATFORM_VALIDATION.md](docs/PHASE10_4_PLATFORM_VALIDATION.md), [PHASE10_4_REPOSITORY_CATALOG.md](docs/PHASE10_4_REPOSITORY_CATALOG.md), [PHASE10_4_HARVEST_REPORT.md](docs/PHASE10_4_HARVEST_REPORT.md), [PHASE10_4_QA_REPORT.md](docs/PHASE10_4_QA_REPORT.md)
+- **Repositori Akademik Indonesia (Phase 10.3–10.4.1):** [PHASE10_3_REPOSITORY_AUDIT.md](docs/PHASE10_3_REPOSITORY_AUDIT.md), [PHASE10_4_PLATFORM_VALIDATION.md](docs/PHASE10_4_PLATFORM_VALIDATION.md), [PHASE10_4_REPOSITORY_CATALOG.md](docs/PHASE10_4_REPOSITORY_CATALOG.md), [PHASE10_4_HARVEST_REPORT.md](docs/PHASE10_4_HARVEST_REPORT.md), [PHASE10_4_QA_REPORT.md](docs/PHASE10_4_QA_REPORT.md), [PHASE10_4_1_UNDIP_INTEGRATION.md](docs/PHASE10_4_1_UNDIP_INTEGRATION.md)
 
 ---
 

@@ -277,6 +277,14 @@ class OAIRepository(Base):
     failed_records_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rate_limit_delay_sec: Mapped[float] = mapped_column(Float, nullable=False, default=0.8)
     request_timeout_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    legacy_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    policy_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    fulltext_policy: Mapped[str] = mapped_column(String(64), nullable=False, default="OPEN_PUBLIC_PDF")
+    harvesting_permission_status: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="OPEN_UNRESTRICTED"
+    )
+    default_download_pdfs: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    record_count_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     year_from: Mapped[int | None] = mapped_column(Integer, nullable=True)
     year_to: Mapped[int | None] = mapped_column(Integer, nullable=True)
     keyword_filter: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -400,5 +408,14 @@ class RepositoryCatalogEntry(Base):
     available_sets: Mapped[list | None] = mapped_column(JSON, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    legacy_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    policy_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    fulltext_policy: Mapped[str] = mapped_column(String(64), nullable=False, default="OPEN_PUBLIC_PDF")
+    harvesting_permission_status: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="OPEN_UNRESTRICTED"
+    )
+    default_download_pdfs: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    requires_verification_before_save: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    record_count_estimate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_custom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)

@@ -822,11 +822,11 @@ export const RepositoriesPage: React.FC = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Universitas & Repositori</TableHead>
-                          <TableHead>Platform</TableHead>
+                          <TableHead>Universitas &amp; Repositori</TableHead>
                           <TableHead>Status OAI-PMH</TableHead>
-                          <TableHead className="text-right">Koleksi</TableHead>
+                          <TableHead className="text-right">Koleksi / Record</TableHead>
                           <TableHead>Format Metadata</TableHead>
+                          <TableHead>Kebijakan Full-Text &amp; Izin Panen</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -834,17 +834,23 @@ export const RepositoriesPage: React.FC = () => {
                         {catalogItems.map((item) => {
                           const isTesting = testingCatalogId === item.id;
                           const isAdding = addingCatalogId === item.id;
+                          const isRestricted = item.harvesting_permission_status === "METADATA_ALLOWED_FULLTEXT_RESTRICTED";
                           return (
                             <TableRow key={item.id}>
-                              <TableCell className="max-w-[300px]">
-                                <div className="font-medium text-foreground">{item.university}</div>
+                              <TableCell className="max-w-[290px]">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-medium text-foreground">{item.university}</span>
+                                  <Badge variant="outline" className="text-[10px]">{item.platform_label}</Badge>
+                                </div>
                                 <div className="text-xs text-foreground/85">{item.name}</div>
                                 <div className="text-[11px] font-mono text-muted-foreground truncate" title={item.base_url}>
                                   {item.base_url}
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{item.platform_label}</Badge>
+                                {item.legacy_url && (
+                                  <div className="text-[10px] font-mono text-muted-foreground truncate" title={item.legacy_url}>
+                                    Lama (redirect): {item.legacy_url}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {connectionBadge(item.oai_status)}
@@ -854,10 +860,17 @@ export const RepositoriesPage: React.FC = () => {
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right tabular-nums font-medium">
-                                {item.last_tested_at ? item.collections_count : "-"}
+                              <TableCell className="text-right tabular-nums text-xs">
+                                <div className="font-medium">
+                                  {item.last_tested_at ? `${item.collections_count} koleksi` : "-"}
+                                </div>
+                                <div className="text-muted-foreground">
+                                  {item.record_count_estimate !== null && item.record_count_estimate !== undefined
+                                    ? `${item.record_count_estimate.toLocaleString("id-ID")} rekaman`
+                                    : "-"}
+                                </div>
                               </TableCell>
-                              <TableCell className="max-w-[200px]">
+                              <TableCell className="max-w-[180px]">
                                 {item.supported_formats.length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
                                     {item.supported_formats.slice(0, 4).map((fmt) => (
@@ -873,6 +886,25 @@ export const RepositoriesPage: React.FC = () => {
                                   </div>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">Belum diuji</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="max-w-[230px] text-xs">
+                                <Badge variant={isRestricted ? "secondary" : "outline"} className="text-[10px] mb-1">
+                                  {item.fulltext_policy_label || "Full-Text Publik Terbuka"}
+                                </Badge>
+                                <div className="text-[11px] text-muted-foreground leading-snug">
+                                  {item.harvesting_permission_label || "Terbuka untuk Metadata & Full-Text"}
+                                </div>
+                                {item.policy_url && (
+                                  <a
+                                    href={item.policy_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-0.5"
+                                  >
+                                    <span>Kebijakan Data</span>
+                                    <ExternalLink className="size-3" aria-hidden="true" />
+                                  </a>
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
@@ -895,13 +927,24 @@ export const RepositoriesPage: React.FC = () => {
                                     variant={item.already_in_personal ? "secondary" : "default"}
                                     disabled={isAdding || item.already_in_personal}
                                     onClick={() => handleAddFromCatalog(item)}
+                                    title={
+                                      item.requires_verification_before_save && item.oai_status === "UNVERIFIED"
+                                        ? "Akan menjalankan uji koneksi otomatis sebelum disimpan"
+                                        : undefined
+                                    }
                                   >
                                     {isAdding ? (
                                       <Loader2 className="size-3.5 animate-spin mr-1" aria-hidden="true" />
                                     ) : (
                                       <Plus className="size-3.5 mr-1" aria-hidden="true" />
                                     )}
-                                    <span>{item.already_in_personal ? "Di Daftar" : "Tambahkan"}</span>
+                                    <span>
+                                      {item.already_in_personal
+                                        ? "Di Daftar"
+                                        : item.requires_verification_before_save && item.oai_status === "UNVERIFIED"
+                                          ? "Uji & Tambah"
+                                          : "Tambahkan"}
+                                    </span>
                                   </Button>
                                 </div>
                               </TableCell>

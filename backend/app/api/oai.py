@@ -25,6 +25,8 @@ from app.security import enforce_rate_limit, require_auth
 from app.sources.oai_catalog import (
     add_catalog_entry,
     ensure_catalog_seeded,
+    fulltext_policy_label,
+    permission_status_label,
     promote_catalog_entry_to_personal,
     serialize_catalog_entry,
     test_catalog_entry,
@@ -50,12 +52,17 @@ router = APIRouter(prefix="/oai", tags=["oai-pmh"], dependencies=[Depends(requir
 class OAIRepoCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     base_url: str = Field(..., min_length=8, max_length=1024)
+    legacy_url: str | None = Field(default=None, max_length=1024)
+    policy_url: str | None = Field(default=None, max_length=1024)
+    fulltext_policy: str = Field(default="OPEN_PUBLIC_PDF", max_length=64)
+    harvesting_permission_status: str = Field(default="OPEN_UNRESTRICTED", max_length=64)
+    default_download_pdfs: bool = True
     repo_type: str = Field(default="other", max_length=32)
     metadata_prefix: str = Field(default="oai_dc", min_length=2, max_length=64)
     selected_set: str | None = Field(default=None, max_length=255)
     enabled: bool = True
     rate_limit_delay_sec: float = Field(default=0.8, ge=0.0, le=30.0)
-    request_timeout_sec: int = Field(default=20, ge=5, le=120)
+    request_timeout_sec: int = Field(default=25, ge=5, le=120)
     year_from: int | None = Field(default=None, ge=1900, le=2100)
     year_to: int | None = Field(default=None, ge=1900, le=2100)
     keyword_filter: str | None = Field(default=None, max_length=255)
@@ -119,7 +126,8 @@ class OAIPreviewRequest(BaseModel):
 class OAIHarvestRequest(BaseModel):
     max_records: int = Field(default=15, ge=1, le=200)
     max_downloads: int | None = Field(default=None, ge=0, le=200)
-    download_pdfs: bool = True
+    download_pdfs: bool | None = None
+    policy_override_confirmed: bool = False
     resume: bool = False
     reset_cursor: bool = False
     incremental: bool = True
@@ -174,6 +182,14 @@ def _serialize_repo(r: OAIRepository, db: Session | None = None) -> dict[str, An
         "failed_records_count": r.failed_records_count,
         "rate_limit_delay_sec": r.rate_limit_delay_sec,
         "request_timeout_sec": r.request_timeout_sec,
+        "legacy_url": r.legacy_url,
+        "policy_url": r.policy_url,
+        "fulltext_policy": r.fulltext_policy or "OPEN_PUBLIC_PDF",
+        "fulltext_policy_label": fulltext_policy_label(r.fulltext_policy),
+        "harvesting_permission_status": r.harvesting_permission_status or "OPEN_UNRESTRICTED",
+        "harvesting_permission_label": permission_status_label(r.harvesting_permission_status),
+        "default_download_pdfs": bool(r.default_download_pdfs),
+        "record_count_estimate": r.record_count_estimate,
         "year_from": r.year_from,
         "year_to": r.year_to,
         "keyword_filter": r.keyword_filter,
@@ -341,6 +357,15 @@ def add_catalog_entry_to_personal(
     if entry is None:
         raise HTTPException(status_code=404, detail="Entri katalog repositori tidak ditemukan.")
     req = body or OAICatalogAddPersonalRequest()
+    if entry.requires_verification_before_save and entry.oai_status not in {"VERIFIED", "PARTIAL"}:
+        entry, wizard = test_catalog_entry(db, entry)
+        if entry.oai_status not in {"VERIFIED", "PARTIAL"}:
+            cat_lbl = wizard.get("failure_category_label") or "Kegagalan Koneksi"
+            fail_msg = wizard.get("failure_message") or entry.last_error or "Uji koneksi gagal."
+            raise HTTPException(
+                status_code=400,
+                detail=f"Preset wajib lolos uji koneksi sebelum disimpan ({cat_lbl}): {fail_msg}",
+            )
     repo, created_new = promote_catalog_entry_to_personal(
         db,
         entry,
@@ -416,6 +441,11 @@ def add_oai_repository(
     repo = OAIRepository(
         name=body.name.strip(),
         base_url=clean_url,
+        legacy_url=body.legacy_url.strip() if body.legacy_url else None,
+        policy_url=body.policy_url.strip() if body.policy_url else None,
+        fulltext_policy=body.fulltext_policy,
+        harvesting_permission_status=body.harvesting_permission_status,
+        default_download_pdfs=body.default_download_pdfs,
         repo_type=norm_type,
         platform_detected=inferred_platform if inferred_platform != "other" else norm_type,
         metadata_prefix=body.metadata_prefix.strip() or "oai_dc",
@@ -560,6 +590,8 @@ def verify_oai_repository(repo_id: str, db: Session = Depends(get_db)) -> dict[s
         repo.supported_formats = report["supported_formats"]
     if report.get("available_sets") is not None:
         repo.available_sets = report["available_sets"]
+    if report.get("record_count_estimate") is not None:
+        repo.record_count_estimate = int(report["record_count_estimate"])
 
     if report["ok"]:
         repo.status = "VERIFIED"
@@ -651,6 +683,7 @@ def trigger_oai_harvest(
             max_records=req.max_records,
             max_downloads=req.max_downloads,
             download_pdfs=req.download_pdfs,
+            policy_override_confirmed=req.policy_override_confirmed,
             resume=req.resume,
             reset_cursor=req.reset_cursor,
             incremental=req.incremental,
@@ -722,6 +755,7 @@ def resume_oai_harvest(
             max_records=req.max_records,
             max_downloads=req.max_downloads,
             download_pdfs=req.download_pdfs,
+            policy_override_confirmed=req.policy_override_confirmed,
             resume=True,
             reset_cursor=False,
             incremental=req.incremental,

@@ -1,0 +1,228 @@
+{
+  "executed_at": "2026-11-25T18:03:30.421227+00:00",
+  "new_endpoint": "https://eprints2.undip.ac.id/cgi/oai2",
+  "legacy_endpoint": "http://eprints.undip.ac.id/cgi/oai2",
+  "policy_url": "https://eprints2.undip.ac.id/policies.html",
+  "legacy_probe": {
+    "http_status": 301,
+    "location": "https://eprints.undip.ac.id:443/cgi/oai2?verb=Identify"
+  },
+  "policy_probe": {
+    "http_status": 200,
+    "contains_metadata_policy": true,
+    "contains_robot_restriction": true
+  },
+  "wizard": {
+    "ok": true,
+    "overall_status": "READY",
+    "effective_url": "https://eprints2.undip.ac.id/cgi/oai2",
+    "platform_detected": "eprints",
+    "identified_name": "Undip Repository",
+    "identify": {
+      "repositoryName": "Undip Repository",
+      "baseURL": "https://eprints2.undip.ac.id/cgi/oai2",
+      "protocolVersion": "2.0",
+      "adminEmail": "lisensi@live.undip.ac.id",
+      "earliestDatestamp": "2019-12-30T01:04:29Z",
+      "deletedRecord": "persistent",
+      "granularity": "YYYY-MM-DDThh:mm:ssZ"
+    },
+    "supported_formats": [
+      "didl",
+      "mets",
+      "oai_bibl",
+      "oai_dc",
+      "rdf",
+      "uketd_dc"
+    ],
+    "collections_count": 100,
+    "record_count_estimate": 99,
+    "stages": [
+      {
+        "step": 1,
+        "key": "url_validation",
+        "status": "PASS",
+        "http_status": null,
+        "error_code": null,
+        "error_category": null,
+        "message": "URL publik valid (EPrints)."
+      },
+      {
+        "step": 2,
+        "key": "http_connectivity",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "error_category": null,
+        "message": "Server merespons HTTP 200."
+      },
+      {
+        "step": 3,
+        "key": "identify",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "error_category": null,
+        "message": "Teridentifikasi: Undip Repository (OAI-PMH v2.0, platform EPrints)."
+      },
+      {
+        "step": 4,
+        "key": "list_metadata_formats",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "error_category": null,
+        "message": "Ditemukan 6 format metadata (didl, mets, oai_bibl, oai_dc, rdf, uketd_dc). Menggunakan 'oai_dc'."
+      },
+      {
+        "step": 5,
+        "key": "list_sets",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "error_category": null,
+        "message": "Ditemukan 100 koleksi/set yang dapat dipilih."
+      },
+      {
+        "step": 6,
+        "key": "test_list_records",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "error_category": null,
+        "message": "Berhasil mengambil 99 rekaman aktif (1 dihapus) dengan dukungan paginasi resumptionToken."
+      },
+      {
+        "step": 7,
+        "key": "metadata_validation",
+        "status": "PASS",
+        "http_status": null,
+        "error_code": null,
+        "error_category": null,
+        "message": "Dari 99 sampel: 99 memiliki judul, 99 penulis, 23 tahun terbit, 0 DOI."
+      },
+      {
+        "step": 8,
+        "key": "fulltext_url_discovery",
+        "status": "PASS",
+        "http_status": null,
+        "error_code": null,
+        "error_category": null,
+        "message": "Ditemukan URL PDF langsung pada 99 dari 99 sampel rekaman."
+      }
+    ]
+  },
+  "verbs_verification": {
+    "list_records_p1_count": 99,
+    "resumption_token_p1": "metadataPrefix%3Doai_dc%26offset%3D108",
+    "get_record_identifier": "oai:eprints2.undip.ac.id:4",
+    "get_record_title": "Lembar hasil Penilaian Sejawat Jurnal Ilmiah : Penyuluhan metode Pembuatan kapal nelayan berbahan kayu",
+    "get_record_landing_urls": [
+      "https://eprints2.undip.ac.id/id/eprint/4/",
+      "https://eprints2.undip.ac.id/id/eprint/4/1/Peer_Review_C-1_AKY.pdf.pdf"
+    ],
+    "get_record_pdf_urls": [
+      "https://eprints2.undip.ac.id/id/eprint/4/1/Peer_Review_C-1_AKY.pdf.pdf"
+    ],
+    "list_records_p2_count": 100,
+    "resumption_token_p2": "metadataPrefix%3Doai_dc%26offset%3D215"
+  },
+  "api_e2e": {
+    "catalog_initial_status": "UNVERIFIED",
+    "catalog_tested_status": "VERIFIED",
+    "catalog_formats": [
+      "didl",
+      "mets",
+      "oai_bibl",
+      "oai_dc",
+      "rdf",
+      "uketd_dc"
+    ],
+    "catalog_collections": 100,
+    "personal_repo_status": "VERIFIED",
+    "fulltext_policy": "METADATA_ONLY_DEFAULT",
+    "harvesting_permission_status": "METADATA_ALLOWED_FULLTEXT_RESTRICTED",
+    "harvest_summary": {
+      "run_id": "90f891a9-7584-4ac8-af7b-59068fc2013f",
+      "repository": "UNDIP Institutional Repository",
+      "records_scanned": 5,
+      "records_matched_filter": 5,
+      "records_harvested": 5,
+      "records_seen": 5,
+      "fulltext_indexed": 0,
+      "metadata_only": 5,
+      "pdf_urls_found": 5,
+      "pdf_accessible": 0,
+      "duplicates_skipped": 0,
+      "deleted_skipped": 0,
+      "failed_records": 0,
+      "pages_fetched": 1,
+      "has_more": true,
+      "harvest_state": "COMPLETED",
+      "status": "VERIFIED"
+    },
+    "sample_saved_records": [
+      {
+        "oai_identifier": "oai:eprints2.undip.ac.id:8",
+        "title": "Hasil Scan Plagiasi (TURNITIN) : Penyuluhan metode Pembuatan kapal nelayan berbahan kayu",
+        "status": "PDF_FOUND",
+        "landing_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/8/",
+          "https://eprints2.undip.ac.id/id/eprint/8/1/Turnitin_PENYULUHAN%20METODE%20PEMBUATAN%20KAPAL%20NELAYAN%20BERBAHAN%20KAYU%20DENGAN%20TEKNIK%20LAMINASI%20BAGI%20PARA%20PEKERJA%20DI%20GALANGAN%20KAPAL%20KAYU%20KARANGASEM%2C%20BATANG%2C%20JAWA%20TENGAH.pdf"
+        ],
+        "pdf_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/8/1/Turnitin_PENYULUHAN%20METODE%20PEMBUATAN%20KAPAL%20NELAYAN%20BERBAHAN%20KAYU%20DENGAN%20TEKNIK%20LAMINASI%20BAGI%20PARA%20PEKERJA%20DI%20GALANGAN%20KAPAL%20KAYU%20KARANGASEM%2C%20BATANG%2C%20JAWA%20TENGAH.pdf"
+        ]
+      },
+      {
+        "oai_identifier": "oai:eprints2.undip.ac.id:7",
+        "title": "Hasil Scan Plagiasi (TURNITIN) : Skin-Friction Drag Measurement Over A Recently Cleaned And Painted Ship Hull Under Steady Cruising Via In-Situ Laser-Based Measurement Coupled With Empirical Estimation.",
+        "status": "PDF_FOUND",
+        "landing_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/7/",
+          "https://eprints2.undip.ac.id/id/eprint/7/1/Turnitin%20SKIN-FRICTION%20DRAG%20MEASUREMENT%20OVER%20A%20RECENTLY%20CLEANED%20AND%20PAINTED%20SHIP%20HULL%20UNDER%20STEADY%20CRUISING%20VIA%20IN-SITU%20LASER-BASED%20MEASUREMENT%20COUPLED%20WITH%20EMPIRICAL%20ESTIMATION.pdf"
+        ],
+        "pdf_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/7/1/Turnitin%20SKIN-FRICTION%20DRAG%20MEASUREMENT%20OVER%20A%20RECENTLY%20CLEANED%20AND%20PAINTED%20SHIP%20HULL%20UNDER%20STEADY%20CRUISING%20VIA%20IN-SITU%20LASER-BASED%20MEASUREMENT%20COUPLED%20WITH%20EMPIRICAL%20ESTIMATION.pdf"
+        ]
+      },
+      {
+        "oai_identifier": "oai:eprints2.undip.ac.id:6",
+        "title": "Lembar hasil Penilaian Sejawat Jurnal Ilmiah : aSkin-Friction Drag Measurement Over A Recently Cleaned And Painted Ship Hull Under Steady Cruising Via In-Situ Laser-Based Measurement Coupled With Empirical Estimation.",
+        "status": "PDF_FOUND",
+        "landing_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/6/",
+          "https://eprints2.undip.ac.id/id/eprint/6/1/Peer_Review_C-3_AKY.pdf.pdf"
+        ],
+        "pdf_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/6/1/Peer_Review_C-3_AKY.pdf.pdf"
+        ]
+      },
+      {
+        "oai_identifier": "oai:eprints2.undip.ac.id:5",
+        "title": "Lembar hasil Penilaian Sejawat Jurnal Ilmiah : Longitudinal Tensile test Of Bamboo lamination",
+        "status": "PDF_FOUND",
+        "landing_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/5/",
+          "https://eprints2.undip.ac.id/id/eprint/5/1/Peer_Review_C-2_AKY.pdf.pdf"
+        ],
+        "pdf_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/5/1/Peer_Review_C-2_AKY.pdf.pdf"
+        ]
+      },
+      {
+        "oai_identifier": "oai:eprints2.undip.ac.id:4",
+        "title": "Lembar hasil Penilaian Sejawat Jurnal Ilmiah : Penyuluhan metode Pembuatan kapal nelayan berbahan kayu",
+        "status": "PDF_FOUND",
+        "landing_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/4/",
+          "https://eprints2.undip.ac.id/id/eprint/4/1/Peer_Review_C-1_AKY.pdf.pdf"
+        ],
+        "pdf_urls": [
+          "https://eprints2.undip.ac.id/id/eprint/4/1/Peer_Review_C-1_AKY.pdf.pdf"
+        ]
+      }
+    ],
+    "logs_count": 4
+  }
+}
