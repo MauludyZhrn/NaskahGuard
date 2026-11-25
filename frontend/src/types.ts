@@ -91,21 +91,157 @@ export interface ProviderHealthItem {
   last_error: string | null;
 }
 
+export interface OAIWizardStage {
+  step: number;
+  key: string;
+  title: string;
+  status: "PASS" | "WARN" | "FAIL" | "SKIP";
+  http_status: number | null;
+  error_code: string | null;
+  message: string;
+  suggestion: string | null;
+  duration_ms: number;
+  data?: Record<string, unknown>;
+}
+
+export interface OAISampleRecord {
+  identifier: string;
+  datestamp: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  rights: string | null;
+  urls: string[];
+  pdf_urls: string[];
+  set_specs?: string[];
+}
+
+export interface OAIConnectionWizardReport {
+  ok: boolean;
+  overall_status: "READY" | "PARTIAL" | "FAILED";
+  summary_counts: { pass: number; warn: number; fail: number };
+  input_url: string;
+  effective_url: string;
+  platform_detected: string;
+  platform_label: string;
+  identified_name: string | null;
+  identify?: Record<string, string>;
+  recommended_prefix: string;
+  supported_formats: string[];
+  available_sets: Array<{ setSpec: string; setName: string }>;
+  sample_records: OAISampleRecord[];
+  stages: OAIWizardStage[];
+  tested_at: string;
+  auto_detect_suggestion?: OAIAutoDetectResult | null;
+}
+
+export interface OAIAutoDetectResult {
+  found: boolean;
+  input_url: string;
+  detected_url: string | null;
+  identified_base_url?: string | null;
+  platform_detected: string;
+  platform_label?: string;
+  identified_name: string | null;
+  attempts: Array<{
+    url: string;
+    status: string;
+    http_status?: number | null;
+    error_code?: string | null;
+    message: string;
+  }>;
+  message: string;
+}
+
+export interface OAIRepositoryFunnel {
+  metadata_found: number;
+  metadata_saved: number;
+  pdf_urls_found: number;
+  pdf_accessible: number;
+  fulltext_extracted: number;
+  document_indexed: number;
+  document_compared: number;
+  failed_records: number;
+}
+
 export interface OAIRepositoryItem {
   id: string;
   name: string;
   base_url: string;
   repo_type: string;
+  platform_detected?: string | null;
+  platform_label?: string;
   enabled: boolean;
   identified_name: string | null;
   metadata_prefix: string;
+  selected_set?: string | null;
+  supported_formats?: string[];
+  available_sets?: Array<{ setSpec: string; setName: string }>;
+  has_resumption_token?: boolean;
+  harvest_state?: string;
+  last_test_report?: OAIConnectionWizardReport | null;
   last_harvested_at: string | null;
   last_datestamp: string | null;
   records_harvested: number;
+  metadata_saved_count?: number;
+  pdf_urls_found_count?: number;
+  pdf_accessible_count?: number;
+  fulltext_extracted_count?: number;
   fulltext_indexed: number;
+  failed_records_count?: number;
+  rate_limit_delay_sec?: number;
+  request_timeout_sec?: number;
+  funnel?: OAIRepositoryFunnel;
   status: string;
   last_error: string | null;
   created_at: string | null;
+  updated_at?: string | null;
+}
+
+export interface OAIHarvestRecordItem {
+  id: number;
+  repository_id: string;
+  oai_identifier: string;
+  datestamp: string | null;
+  set_spec: string | null;
+  metadata_prefix: string | null;
+  deleted: boolean;
+  title: string | null;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  rights: string | null;
+  landing_urls: string[];
+  pdf_urls: string[];
+  status: string;
+  document_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  attempts: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface OAIHarvestLogItem {
+  id: number;
+  repository_id: string;
+  level: string;
+  stage: string;
+  http_status: number | null;
+  error_code: string | null;
+  message: string;
+  details: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface OAIReferenceEndpoint {
+  name: string;
+  base_url: string;
+  platform: string;
+  metadata_prefix: string;
+  default_set: string;
+  note: string;
 }
 
 export interface AiSignalItem {

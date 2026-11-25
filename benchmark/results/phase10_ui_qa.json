@@ -4,7 +4,7 @@
   "page_errors": [],
   "bad_http": [],
   "dark_mode_verified": true,
-  "checks_count": 17,
+  "checks_count": 18,
   "layout_checks": [
     {
       "viewport": "desktop_1440_light",
@@ -78,7 +78,14 @@
     },
     {
       "viewport": "desktop_1440_light",
-      "route": "/reports/667c1ee7-71a2-4b0b-bd84-c9089ea4281e",
+      "route": "/repositories/d9099a36-2e5c-4704-b6a1-3a731fbb2d6c",
+      "expected_found": true,
+      "horizontal_overflow": false,
+      "svg_icons_present": true
+    },
+    {
+      "viewport": "desktop_1440_light",
+      "route": "/reports/c370a830-1625-4d09-a351-a8f5ec4a0be3",
       "expected_found": true,
       "horizontal_overflow": false,
       "svg_icons_present": true
@@ -147,6 +154,8 @@
     "18_tablet_new_check.png",
     "19_mobile_new_check.png",
     "20_dashboard_dark_collapsed.png",
-    "21_report_detail_annotated_text.png"
+    "21_report_detail_annotated_text.png",
+    "22_repositories_add_modal.png",
+    "23_repository_detail.png"
   ]
 }

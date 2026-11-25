@@ -176,6 +176,19 @@ def main() -> int:
                     },
                 ).json()["check_id"]
 
+                # 4. Seed one OAI repository to verify Phase 10.3 Repositories table & Detail Page
+                oai_seed = c.post(
+                    "/oai/repositories",
+                    json={
+                        "name": "arXiv Public OAI-PMH",
+                        "base_url": "https://oaipmh.arxiv.org/oai",
+                        "repo_type": "arxiv",
+                        "metadata_prefix": "oai_dc",
+                        "selected_set": "cs",
+                    },
+                )
+                repo_id = oai_seed.json().get("id") if oai_seed.status_code == 201 else None
+
                 for cid in (comb_id, plag_id, ai_id):
                     for _ in range(45):
                         if c.get(f"/checks/{cid}").json()["status"] == "COMPLETED":
@@ -207,6 +220,11 @@ def main() -> int:
                     ("/corpus", "08_corpus.png", "Korpus Sumber"),
                     ("/discovery-monitor", "09_discovery_monitor.png", "Monitor Penemuan"),
                     ("/repositories", "10_repositories.png", "Repositori Akademik"),
+                    *(
+                        [(f"/repositories/{repo_id}", "23_repository_detail.png", "Alur Akuisisi Metadata")]
+                        if repo_id
+                        else []
+                    ),
                     (f"/reports/{comb_id}", "11_report_detail_plagiarism.png", "Kemiripan Keseluruhan"),
                     ("/analytics", "12_analytics.png", "Analitik"),
                     ("/analytics/ai", "13_analytics_ai.png", "Analitik Deteksi Tulisan AI"),
@@ -228,6 +246,15 @@ def main() -> int:
                         "svg_icons_present": svg_count > 0,
                     })
                     page.screenshot(path=str(SCREENSHOT_DIR / fname), full_page=False)
+
+                # Capture Add Repository + 8-Stage Connection Wizard Modal
+                page.goto(f"{base_url}/repositories", wait_until="networkidle")
+                page.wait_for_timeout(350)
+                add_repo_btn = page.get_by_role("button", name="Tambah Repositori")
+                if add_repo_btn.count() > 0:
+                    add_repo_btn.first.click()
+                    page.wait_for_timeout(350)
+                page.screenshot(path=str(SCREENSHOT_DIR / "22_repositories_add_modal.png"), full_page=False)
 
                 # Capture annotated manuscript tab with left-margin colored pills
                 page.goto(f"{base_url}/reports/{comb_id}", wait_until="networkidle")

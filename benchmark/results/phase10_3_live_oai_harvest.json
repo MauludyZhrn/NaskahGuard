@@ -1,0 +1,155 @@
+{
+  "executed_at": "2026-11-25T17:01:11.405579+00:00",
+  "target_url": "https://oaipmh.arxiv.org/oai",
+  "target_set": "cs",
+  "wizard": {
+    "ok": true,
+    "overall_status": "READY",
+    "identified_name": "arXiv",
+    "platform_detected": "arxiv",
+    "supported_formats": [
+      "oai_dc",
+      "arXiv",
+      "arXivOld",
+      "arXivRaw"
+    ],
+    "available_sets_count": 100,
+    "stages": [
+      {
+        "step": 1,
+        "key": "url_validation",
+        "status": "PASS",
+        "http_status": null,
+        "error_code": null,
+        "message": "URL publik valid (arXiv OAI-PMH)."
+      },
+      {
+        "step": 2,
+        "key": "http_connectivity",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "message": "Server merespons HTTP 200."
+      },
+      {
+        "step": 3,
+        "key": "identify",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "message": "Teridentifikasi: arXiv (OAI-PMH v2.0, platform arXiv OAI-PMH)."
+      },
+      {
+        "step": 4,
+        "key": "list_metadata_formats",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "message": "Ditemukan 4 format metadata (oai_dc, arXiv, arXivOld, arXivRaw). Menggunakan 'oai_dc'."
+      },
+      {
+        "step": 5,
+        "key": "list_sets",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "message": "Ditemukan 100 koleksi/set yang dapat dipilih."
+      },
+      {
+        "step": 6,
+        "key": "test_list_records",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "message": "Berhasil mengambil 1300 rekaman aktif dengan dukungan paginasi resumptionToken."
+      },
+      {
+        "step": 7,
+        "key": "metadata_validation",
+        "status": "PASS",
+        "http_status": null,
+        "error_code": null,
+        "message": "Dari 1300 sampel: 1300 memiliki judul, 1300 penulis, 1300 tahun terbit, 23 DOI."
+      },
+      {
+        "step": 8,
+        "key": "fulltext_url_discovery",
+        "status": "PASS",
+        "http_status": 200,
+        "error_code": null,
+        "message": "Ditemukan URL PDF langsung pada 1300 dari 1300 sampel rekaman. Sampel PDF dapat diakses langsung (HTTP 200)."
+      }
+    ]
+  },
+  "harvest_summary": {
+    "repository": "arXiv Public OAI-PMH (Live Verification)",
+    "records_harvested": 3,
+    "records_seen": 3,
+    "fulltext_indexed": 3,
+    "metadata_only": 0,
+    "pdf_urls_found": 3,
+    "pdf_accessible": 3,
+    "duplicates_skipped": 0,
+    "deleted_skipped": 0,
+    "failed_records": 0,
+    "pages_fetched": 1,
+    "has_more": true,
+    "harvest_state": "COMPLETED",
+    "status": "VERIFIED"
+  },
+  "funnel_7_stage": {
+    "metadata_found": 3,
+    "metadata_saved": 3,
+    "pdf_urls_found": 3,
+    "pdf_accessible": 3,
+    "fulltext_extracted": 3,
+    "document_indexed": 3,
+    "document_compared": 1,
+    "failed_records": 0
+  },
+  "records": [
+    {
+      "oai_identifier": "oai:arXiv.org:adap-org/9807003",
+      "title": "Development and Evolution of Neural Networks in an Artificial Chemistry",
+      "year": 1998,
+      "status": "INDEXED",
+      "pdf_urls": [
+        "https://arxiv.org/pdf/adap-org/9807003.pdf"
+      ],
+      "document_id": "817f1a5f-891f-4aaf-8ddf-4b0cef245dd5",
+      "error_code": null
+    },
+    {
+      "oai_identifier": "oai:arXiv.org:adap-org/9903003",
+      "title": "Evolution of genetic organization in digital organisms",
+      "year": 1999,
+      "status": "INDEXED",
+      "pdf_urls": [
+        "https://arxiv.org/pdf/adap-org/9903003.pdf"
+      ],
+      "document_id": "2539f280-c48f-469a-8aa6-cbbbed36b4ef",
+      "error_code": null
+    },
+    {
+      "oai_identifier": "oai:arXiv.org:astro-ph/0008307",
+      "title": "Science User Scenarios for a Virtual Observatory Design Reference Mission: Science Requirements for Data Mining",
+      "year": 2000,
+      "status": "INDEXED",
+      "pdf_urls": [
+        "https://arxiv.org/pdf/astro-ph/0008307.pdf"
+      ],
+      "document_id": "28c48853-ea0f-4699-a100-86668061f1dd",
+      "error_code": null
+    }
+  ],
+  "logs_count": 3,
+  "similarity_comparison": {
+    "executed": true,
+    "check_status": "COMPLETED",
+    "similarity_index": 85.89,
+    "matched_words": 140,
+    "sources_found": 1,
+    "matched_harvested_doc_title": "Development and Evolution of Neural Networks in an Artificial Chemistry",
+    "matched_harvested_doc_words": 4243
+  }
+}

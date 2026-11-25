@@ -12,6 +12,7 @@ import { ModelManagementPage } from "./pages/ModelManagementPage";
 import { NewCheckPage } from "./pages/NewCheckPage";
 import { ReportDetailPage } from "./pages/ReportDetailPage";
 import { RepositoriesPage } from "./pages/RepositoriesPage";
+import { RepositoryDetailPage } from "./pages/RepositoryDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AppConfig } from "./types";
 
@@ -40,6 +41,7 @@ export const App: React.FC = () => {
           <Route path="/corpus" element={<CorpusPage />} />
           <Route path="/discovery-monitor" element={<DiscoveryMonitorPage />} />
           <Route path="/repositories" element={<RepositoriesPage />} />
+          <Route path="/repositories/:repoId" element={<RepositoryDetailPage />} />
           <Route path="/analytics" element={<AnalyticsOverviewPage focusMode="plagiarism" />} />
           <Route path="/analytics/ai" element={<AnalyticsOverviewPage focusMode="ai" />} />
           <Route path="/settings" element={<SettingsPage />} />
